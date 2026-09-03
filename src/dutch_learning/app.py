@@ -21,7 +21,7 @@ def _get_conn():
 
 @st.cache_resource
 def _get_agent():
-    model = os.getenv("DUTCH_MODEL", "google-gla:gemini-2.0-flash")
+    model = os.getenv("DUTCH_MODEL", "google:gemini-3.6-flash")
     return make_hint_agent(model)
 
 
