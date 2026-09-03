@@ -17,6 +17,7 @@ def _load_due(conn):
         st.session_state.due_cards = get_due_cards(conn, date.today())
         st.session_state.card_idx = 0
         st.session_state.flipped = False
+    if "total_due_today" not in st.session_state:
         st.session_state.total_due_today = len(st.session_state.due_cards)
 
 
