@@ -28,12 +28,18 @@ def _current_card(conn):
     return cards[idx]
 
 
+def _clear_hint_cache():
+    for key in list(st.session_state.keys()):
+        if key.startswith("hint_cache_") or key.startswith("hint_q_"):
+            del st.session_state[key]
+
+
 def _advance(conn):
     st.session_state.card_idx += 1
     st.session_state.flipped = False
-    # Reload if we've gone through all cards
     if st.session_state.card_idx >= len(st.session_state.due_cards):
         del st.session_state["due_cards"]
+        _clear_hint_cache()
 
 
 def render(conn, agent) -> None:
@@ -48,6 +54,7 @@ def render(conn, agent) -> None:
             del st.session_state["due_cards"]
             if "total_due_today" in st.session_state:
                 del st.session_state["total_due_today"]
+            _clear_hint_cache()
             st.rerun()
         return
 
