@@ -11,11 +11,13 @@ dependencies = [
     "logfire>=4.40.0",
     "pydantic-ai-slim[anthropic,google,openai]>=2.32.1",
     "python-dotenv>=1.2.3",
+    "streamlit>=1.40.0",
     "tavily-python>=0.7.27",
 ]
 
 [project.scripts]
 ai-playground = "ai_playground:main"
+dutch-learning = "dutch_learning.importer:main"
 
 [build-system]
 requires = ["uv_build>=0.9.17,<0.10.0"]
@@ -39,6 +41,7 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = "src"
 
 [tool.pyright]
 include = ["src", "tests"]
