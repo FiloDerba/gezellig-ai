@@ -17,14 +17,13 @@ def _load_due(conn):
         st.session_state.due_cards = get_due_cards(conn, date.today())
         st.session_state.card_idx = 0
         st.session_state.flipped = False
+        st.session_state.total_due_today = len(st.session_state.due_cards)
 
 
 def _current_card(conn):
     _load_due(conn)
     cards = st.session_state.due_cards
     idx = st.session_state.card_idx
-    if idx >= len(cards):
-        return None, None
     return cards[idx]
 
 
@@ -43,7 +42,7 @@ def render(conn, agent) -> None:
     remaining = total_due - st.session_state.card_idx
 
     if remaining <= 0:
-        st.success(f"All {total_due} cards done for today!")
+        st.success(f"All {st.session_state.total_due_today} cards done for today!")
         if st.button("Reset session"):
             del st.session_state["due_cards"]
             st.rerun()
