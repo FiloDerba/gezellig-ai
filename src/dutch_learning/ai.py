@@ -8,10 +8,12 @@ SYSTEM_PROMPT = (
 
 
 def make_hint_agent(model: str = "google-gla:gemini-2.0-flash") -> Agent:
+    """Create a pydantic-ai Agent configured as a Dutch tutor."""
     return Agent(model, system_prompt=SYSTEM_PROMPT)
 
 
 def get_hint(agent: Agent, dutch: str, word_type: str, english: str, question: str) -> str:
+    """Run agent synchronously; return text response."""
     prompt = (
         f"The user is studying the Dutch word '{dutch}' ({word_type}, meaning '{english}'). "
         f"Their question: {question}"

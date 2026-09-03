@@ -46,6 +46,8 @@ def render(conn, agent) -> None:
         st.success(f"All {st.session_state.total_due_today} cards done for today!")
         if st.button("Reset session"):
             del st.session_state["due_cards"]
+            if "total_due_today" in st.session_state:
+                del st.session_state["total_due_today"]
             st.rerun()
         return
 
@@ -71,9 +73,13 @@ def render(conn, agent) -> None:
     with st.expander("Ask AI for a hint"):
         question = st.text_input("Your question", key=f"hint_q_{st.session_state.card_idx}")
         if question:
-            with st.spinner("Thinking..."):
-                hint = ai_mod.get_hint(agent, word.dutch, word.word_type, word.english, question)
-            st.markdown(hint)
+            cache_key = f"hint_cache_{st.session_state.card_idx}_{question}"
+            if cache_key not in st.session_state:
+                with st.spinner("Thinking..."):
+                    st.session_state[cache_key] = ai_mod.get_hint(
+                        agent, word.dutch, word.word_type, word.english, question
+                    )
+            st.markdown(st.session_state[cache_key])
 
     st.write("---")
     cols = st.columns(4)

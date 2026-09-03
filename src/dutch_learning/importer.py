@@ -44,7 +44,8 @@ def import_deck(
         for numbered, filename in media_map.items():
             if numbered in zf.namelist():
                 data = zf.read(numbered)
-                (media_dir / filename).write_bytes(data)
+                safe_filename = Path(filename).name
+                (media_dir / safe_filename).write_bytes(data)
 
         # Read notes from embedded SQLite
         raw_db = zf.read("collection.anki2")
