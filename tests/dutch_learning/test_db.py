@@ -108,6 +108,20 @@ def test_get_stats():
     stats = get_stats(conn, date.today())
     assert stats["due_today"] == 1
     assert stats["total_words"] == 1
+    assert stats["total_reviews"] >= 0
+    assert len(stats["by_chapter"]) == 1
+    assert stats["by_chapter"][0]["chapter"] == "Thema01a"
+
+
+def test_get_all_words_search_filter():
+    conn = _conn()
+    upsert_word(conn, _word(id=1, dutch="lezen", english="to read", chapter="Thema01a"))
+    upsert_word(conn, _word(id=2, dutch="schrijven", english="to write", chapter="Thema01a"))
+    upsert_srs_state(conn, _state(word_id=1))
+    upsert_srs_state(conn, _state(word_id=2))
+    result = get_all_words(conn, search="lez")
+    assert len(result) == 1
+    assert result[0][0].dutch == "lezen"
 
 
 def test_update_srs_state():

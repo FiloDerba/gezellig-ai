@@ -69,12 +69,14 @@ def upsert_srs_state(conn: sqlite3.Connection, state: SRSState) -> None:
 
 
 def update_srs_state(conn: sqlite3.Connection, state: SRSState) -> None:
-    conn.execute(
+    cursor = conn.execute(
         """UPDATE srs_state SET interval=?, ease_factor=?, due_date=?, reps=?
            WHERE word_id=?""",
         (state.interval, state.ease_factor, state.due_date.isoformat(),
          state.reps, state.word_id),
     )
+    if cursor.rowcount == 0:
+        raise ValueError(f"no srs_state row for word_id={state.word_id}")
     conn.commit()
 
 
@@ -148,8 +150,8 @@ def get_stats(conn: sqlite3.Connection, today: date) -> dict:
     total_words = conn.execute("SELECT COUNT(*) FROM words").fetchone()[0]
     total_reviews = conn.execute("SELECT SUM(reps) FROM srs_state").fetchone()[0] or 0
     chapter_rows = conn.execute(
-        """SELECT w.chapter, COUNT(*) as count, SUM(s.reps) as reviews
-           FROM words w JOIN srs_state s ON w.id = s.word_id
+        """SELECT w.chapter, COUNT(*) as count, COALESCE(SUM(s.reps), 0) as reviews
+           FROM words w LEFT JOIN srs_state s ON w.id = s.word_id
            GROUP BY w.chapter ORDER BY w.chapter"""
     ).fetchall()
     return {
