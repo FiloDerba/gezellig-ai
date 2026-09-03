@@ -238,3 +238,6 @@ uv.lock.bak
 .logfire/
 
 data/
+
+# Django
+django/staticfiles/

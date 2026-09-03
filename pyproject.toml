@@ -8,16 +8,25 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "django>=6.1.1",
+    "django-filter>=26.1",
+    "djangorestframework>=3.18.0",
+    "drf-spectacular>=0.30.0",
     "logfire>=4.40.0",
+    "psycopg[binary]>=3.2.12",
     "pydantic-ai-slim[anthropic,google,openai]>=2.32.1",
     "python-dotenv>=1.2.3",
+    "requests>=2.34.2",
     "streamlit>=1.40.0",
     "tavily-python>=0.7.27",
 ]
 
+[project.optional-dependencies]
+# Only the container's `web` command needs a real WSGI server.
+deploy = ["gunicorn>=23.0.0"]
+
 [project.scripts]
 ai-playground = "ai_playground:main"
-dutch-learning = "dutch_learning.importer:main"
 
 [build-system]
 requires = ["uv_build>=0.9.17,<0.10.0"]
@@ -28,6 +37,7 @@ dev = [
     "pyright>=1.1.411",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "pytest-django>=4.14.0",
     "ruff>=0.16.3",
 ]
 
@@ -40,8 +50,11 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
-pythonpath = "src"
+testpaths = ["tests", "django"]
+pythonpath = ["src", "django"]
+DJANGO_SETTINGS_MODULE = "backend.settings"
+python_files = ["test_*.py"]
+python_classes = ["Test*", "*Tests"]
 
 [tool.pyright]
 include = ["src", "tests"]
