@@ -99,5 +99,6 @@ def test_import_deck_is_idempotent(tmp_path):
     import_deck(str(apkg), db_path=out_db, media_dir=media_dir)
     count2 = import_deck(str(apkg), db_path=out_db, media_dir=media_dir)
 
+    assert count2 == 2  # processes same notes; INSERT OR IGNORE prevents duplicates
     conn = get_conn(out_db)
     assert len(get_all_words(conn)) == 2  # no duplicates

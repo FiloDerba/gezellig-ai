@@ -1,7 +1,9 @@
 import json
+import os
 import re
 import sqlite3
 import sys
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -12,7 +14,8 @@ MEDIA_DIR = Path("data/media")
 
 
 def _parse_audio(field: str) -> str | None:
-    m = re.match(r"\[sound:(.+?)\]", field)
+    # re.search so [sound:...] is found even when wrapped in HTML
+    m = re.search(r"\[sound:(.+?)\]", field)
     return m.group(1) if m else None
 
 
@@ -46,46 +49,56 @@ def import_deck(
         # Read notes from embedded SQLite
         raw_db = zf.read("collection.anki2")
 
-    tmp_db = Path("/tmp/anki_import_collection.anki2")
-    tmp_db.write_bytes(raw_db)
+    # Use a unique temp file to avoid collisions under concurrent imports
+    fd, tmp_path_str = tempfile.mkstemp(suffix=".anki2")
+    os.close(fd)
+    tmp_db = Path(tmp_path_str)
 
-    anki_conn = sqlite3.connect(tmp_db)
-    anki_conn.row_factory = sqlite3.Row
-    notes = anki_conn.execute(
-        "SELECT id, tags, flds FROM notes"
-    ).fetchall()
-    anki_conn.close()
+    # Ensure temp file is always removed, even on exception
+    try:
+        tmp_db.write_bytes(raw_db)
+
+        # Context manager closes anki_conn on exit (including exception)
+        with sqlite3.connect(tmp_db) as anki_conn:
+            anki_conn.row_factory = sqlite3.Row
+            notes = anki_conn.execute(
+                "SELECT id, tags, flds FROM notes"
+            ).fetchall()
+    finally:
+        tmp_db.unlink(missing_ok=True)
 
     app_conn = get_conn(db_path)
-    init_db(app_conn)
+    # Ensure app_conn is always closed, even on exception
+    try:
+        init_db(app_conn)
 
-    count = 0
-    for note in notes:
-        fields = note["flds"].split("\x1f")
-        if len(fields) < 10:
-            continue
-        dutch = fields[0].strip()
-        english = fields[4].strip()
-        word_type = fields[7].strip()
-        audio_file = _parse_audio(fields[9].strip())
-        if not dutch or not english:
-            continue
+        count = 0
+        for note in notes:
+            fields = note["flds"].split("\x1f")
+            if len(fields) < 10:
+                continue
+            dutch = fields[0].strip()
+            english = fields[4].strip()
+            word_type = fields[7].strip()
+            audio_file = _parse_audio(fields[9].strip())
+            if not dutch or not english:
+                continue
 
-        word = Word(
-            id=note["id"],
-            dutch=dutch,
-            english=english,
-            word_type=word_type,
-            audio_file=audio_file,
-            tags=note["tags"].strip(),
-            chapter=_extract_chapter(note["tags"]),
-        )
-        upsert_word(app_conn, word)
-        upsert_srs_state(app_conn, new_state(word.id))
-        count += 1
+            word = Word(
+                id=note["id"],
+                dutch=dutch,
+                english=english,
+                word_type=word_type,
+                audio_file=audio_file,
+                tags=note["tags"].strip(),
+                chapter=_extract_chapter(note["tags"]),
+            )
+            upsert_word(app_conn, word)
+            upsert_srs_state(app_conn, new_state(word.id))
+            count += 1
+    finally:
+        app_conn.close()
 
-    app_conn.close()
-    tmp_db.unlink(missing_ok=True)
     return count
 
 
