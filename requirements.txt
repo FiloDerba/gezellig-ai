@@ -1,0 +1,9 @@
+altair>=5.5.0
+django>=6.1.1
+logfire>=4.40.0
+pandas>=2.3.0
+psycopg[binary]>=3.2.12
+pydantic-ai-slim[anthropic,google,openai]>=2.32.1
+python-dotenv>=1.2.3
+streamlit>=1.63.0
+tavily-python>=0.7.27

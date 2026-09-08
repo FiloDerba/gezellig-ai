@@ -4,12 +4,33 @@ There is no backend process. `dutch_learning.data` configures Django in this pro
 talks to the database in `django/.env` directly.
 """
 
-import streamlit as st
-from dotenv import load_dotenv
+import os
+import sys
+from pathlib import Path
 
-from dutch_learning import data
+# When running from the cloned repo without package install (Streamlit Cloud, local dev):
+# add src/ so `from dutch_learning import ...` resolves to the source tree.
+# Must happen before any dutch_learning imports so django_bootstrap path calc is correct.
+_REPO_ROOT = Path(__file__).parent
+if str(_REPO_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT / "src"))
 
-load_dotenv()
+import streamlit as st  # noqa: E402
+from dotenv import load_dotenv  # noqa: E402
+
+# Streamlit Cloud stores secrets as TOML; bridge them into os.environ so Django settings
+# and AI provider clients pick them up via standard env-var reads.
+# Must run before `dutch_learning.data` triggers django.setup().
+try:
+    for _k, _v in st.secrets.items():
+        if isinstance(_v, str):
+            os.environ.setdefault(_k, _v)
+except Exception:
+    pass  # No secrets configured (local dev with .env files)
+
+from dutch_learning import data  # noqa: E402
+
+load_dotenv()  # local dev fallback; env vars set above already win
 
 st.set_page_config(
     page_title="Dutch",
@@ -17,7 +38,7 @@ st.set_page_config(
     layout="centered",
 )
 
-PAGE_DIR = "src/dutch_learning/app_pages"
+PAGE_DIR = str(_REPO_ROOT / "src/dutch_learning/app_pages")
 
 # Connections can go stale between reruns, and Streamlit has no request cycle to reset them.
 data.begin_run()
