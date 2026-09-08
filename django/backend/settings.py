@@ -2,11 +2,29 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "insecure-dev-key-change-in-production")
-DEBUG = os.environ.get("DEBUG", "True").capitalize() == "True"
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+# pytest sets this from version 8 onwards.
+RUNNING_TESTS = "PYTEST_VERSION" in os.environ
+
+if not RUNNING_TESTS:
+    # Real environment variables win, so docker-compose and CI still override the file.
+    load_dotenv(BASE_DIR / ".env", override=False)
+
+def env(name: str, default: str = "") -> str:
+    """Read a variable, treating a blank value as unset.
+
+    example.env ships keys with empty values (`SECRET_KEY=`), and those would otherwise
+    override the defaults below with an empty string.
+    """
+    return os.environ.get(name, "").strip() or default
+
+
+SECRET_KEY = env("SECRET_KEY", "insecure-dev-key-change-in-production")
+DEBUG = env("DEBUG", "True").capitalize() == "True"
+ALLOWED_HOSTS = env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -15,9 +33,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django_filters",
-    "rest_framework",
-    "drf_spectacular",
     "vocabulary",
 ]
 
@@ -25,7 +40,6 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    # DRF views are CSRF-exempt, so this only guards the admin's own forms.
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -52,7 +66,7 @@ TEMPLATES = [
 
 
 # Hosted Postgres is often far away, so reuse connections instead of dialling per request.
-CONN_MAX_AGE = int(os.environ.get("CONN_MAX_AGE", "600"))
+CONN_MAX_AGE = int(env("CONN_MAX_AGE", "600"))
 
 # libpq keys we forward from a connection string's query part. Neon needs sslmode and
 # channel_binding; anything outside this set would make psycopg reject the connection.
@@ -91,30 +105,23 @@ def _database_from_url(url: str) -> dict:
     )
 
 
-def _database_from_parts() -> dict:
-    """Discrete DATABASE_* variables, which is how docker-compose passes the local Postgres."""
-    return _postgres(
-        NAME=os.environ["DATABASE_NAME"],
-        USER=os.environ.get("DATABASE_USER", "postgres"),
-        PASSWORD=os.environ.get("DATABASE_PASSWORD", "postgres"),
-        HOST=os.environ.get("DATABASE_HOST", "localhost"),
-        PORT=os.environ.get("DATABASE_PORT", "5432"),
-    )
-
-
-def _default_database() -> dict:
-    """DATABASE_URL wins, then DATABASE_*, then a local SQLite file so `migrate` always works."""
-    if os.environ.get("DATABASE_URL"):
-        return _database_from_url(os.environ["DATABASE_URL"])
-    if os.environ.get("DATABASE_NAME"):
-        return _database_from_parts()
+def _sqlite() -> dict:
     return {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.environ.get("SQLITE_PATH", str(BASE_DIR / "db.sqlite3")),
+        "NAME": env("SQLITE_PATH", str(BASE_DIR / "db.sqlite3")),
     }
 
 
-DATABASES = {"default": _default_database()}
+def _default_database() -> dict:
+    """Hosted Postgres when DATABASE_URL is set, otherwise a local SQLite file."""
+    if env("DATABASE_URL"):
+        return _database_from_url(env("DATABASE_URL"))
+    return _sqlite()
+
+
+# The suite creates and drops databases, so it stays on SQLite even when a hosted
+# DATABASE_URL is configured. Otherwise `pytest` would do that to the Neon project.
+DATABASES = {"default": _sqlite() if RUNNING_TESTS else _default_database()}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -136,24 +143,9 @@ AUTH_PASSWORD_VALIDATORS = (
 )
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = os.environ.get("TIME_ZONE", "Europe/Amsterdam")
+TIME_ZONE = env("TIME_ZONE", "Europe/Amsterdam")
 USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-
-REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": "vocabulary.pagination.StandardPagination",
-    "PAGE_SIZE": 100,
-    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-}
-
-SPECTACULAR_SETTINGS = {
-    "TITLE": "Dutch Vocabulary API",
-    "DESCRIPTION": "Spaced-repetition vocabulary backend for the Dutch learning app.",
-    "VERSION": "1.0.0",
-    "SERVE_INCLUDE_SCHEMA": False,
-}

@@ -1,17 +1,5 @@
 from django.contrib import admin
-from django.http import JsonResponse
-from django.urls import include, path
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from django.urls import path
 
-
-def health(_request):
-    return JsonResponse({"status": "ok"})
-
-
-urlpatterns = [
-    path("admin/", admin.site.urls),
-    path("api/", include("vocabulary.urls")),
-    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
-    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
-    path("health/", health),
-]
+# The Streamlit app uses the ORM directly, so the admin is all this server is for.
+urlpatterns = [path("admin/", admin.site.urls)]

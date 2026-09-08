@@ -2,7 +2,7 @@
 
 from datetime import date, timedelta
 
-from django.db.models import Case, Count, IntegerField, Q, Sum, When
+from django.db.models import Case, Count, IntegerField, Max, Q, Sum, When
 
 from vocabulary.models import ReviewLog, SrsState, Word
 from vocabulary.srs import MATURE_INTERVAL_DAYS
@@ -18,6 +18,61 @@ def due_queue(today: date, limit: int | None = None):
         .order_by("due_date", "queue_rank", "word_id")
     )
     return queryset[:limit] if limit else queryset
+
+
+def words(
+    chapter: str | None = None,
+    search: str | None = None,
+    maturity: str | None = None,
+    today: date | None = None,
+):
+    """The word list behind both `GET /api/words/` and the Streamlit browse page."""
+    queryset = Word.objects.select_related("srs").all()
+    if chapter:
+        queryset = queryset.filter(chapter=chapter)
+    if search:
+        queryset = queryset.filter(Q(dutch__icontains=search) | Q(english__icontains=search))
+    if maturity == "new":
+        queryset = queryset.filter(srs__reps=0)
+    elif maturity == "due":
+        queryset = queryset.filter(srs__due_date__lte=today or date.today())
+    return queryset
+
+
+def encountered(search: str | None = None, limit: int | None = None):
+    """Words the learner has actually rated at least once, most recent first.
+
+    Driven by the review log rather than `reps`, because an "Again" rating resets reps to
+    zero — which would hide precisely the words that turned out to be hard.
+    """
+    queryset = (
+        Word.objects.select_related("srs")
+        .annotate(times_reviewed=Count("reviews"), last_seen=Max("reviews__reviewed_on"))
+        .filter(times_reviewed__gt=0)
+        .order_by("-last_seen", "dutch")
+    )
+    if search:
+        queryset = queryset.filter(Q(dutch__icontains=search) | Q(english__icontains=search))
+    return queryset[:limit] if limit else queryset
+
+
+def speaking_pool(today: date, limit: int = 30):
+    """Words with a native recording, due ones first, then shuffled.
+
+    Pronunciation practice is only useful where there is a reference recording to
+    compare against, which the Anki import provides for most of the deck.
+    """
+    return (
+        Word.objects.select_related("srs")
+        .exclude(audio_file__isnull=True)
+        .exclude(audio_file="")
+        .annotate(
+            queue_rank=Case(
+                When(srs__due_date__lte=today, then=0), default=1, output_field=IntegerField()
+            )
+        )
+        .order_by("queue_rank", "?")[:limit]
+    )
 
 
 def overview(today: date) -> dict:

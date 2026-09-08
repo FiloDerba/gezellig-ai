@@ -1,4 +1,5 @@
 import pytest
+
 from vocabulary.models import ReviewLog, SrsState
 
 
@@ -52,15 +53,3 @@ class AdminTests:
         response = client.get("/admin/vocabulary/word/")
         assert response.status_code == 302
         assert "/admin/login/" in response.url
-
-
-@pytest.mark.django_db
-class ApiStillWorksWithAdminMiddlewareTests:
-    def test_api_post_is_not_blocked_by_csrf(self, client, word):
-        """DRF views are CSRF-exempt, so adding CsrfViewMiddleware must not break them."""
-        response = client.post(
-            f"/api/study/{word.id}/review/",
-            data={"quality": 3},
-            content_type="application/json",
-        )
-        assert response.status_code == 200

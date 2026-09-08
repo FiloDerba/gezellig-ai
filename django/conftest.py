@@ -1,13 +1,8 @@
 from datetime import date, timedelta
 
 import pytest
-from rest_framework.test import APIClient
+
 from vocabulary.models import SrsState, Word
-
-
-@pytest.fixture
-def api_client() -> APIClient:
-    return APIClient()
 
 
 @pytest.fixture
@@ -24,9 +19,22 @@ def word(db) -> Word:
 def make_card(db):
     """Factory for a word plus scheduling state, so tests can set up a queue."""
 
-    def _make(dutch="woord", english="word", chapter="Thema01a", reps=0, interval=1, due_offset=0):
+    def _make(
+        dutch="woord",
+        english="word",
+        chapter="Thema01a",
+        word_type="noun",
+        audio_file=None,
+        reps=0,
+        interval=1,
+        due_offset=0,
+    ):
         instance = Word.objects.create(
-            dutch=dutch, english=english, word_type="noun", chapter=chapter
+            dutch=dutch,
+            english=english,
+            word_type=word_type,
+            chapter=chapter,
+            audio_file=audio_file,
         )
         SrsState.objects.create(
             word=instance,
