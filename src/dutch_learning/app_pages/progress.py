@@ -27,8 +27,12 @@ st.altair_chart(
     alt.Chart(activity)
     .mark_bar(size=11, cornerRadiusEnd=3, color=ACCENT)
     .encode(
-        x=alt.X("date:T", title=None, scale=alt.Scale(padding=18),
-                axis=alt.Axis(format="%b %d", grid=False)),
+        x=alt.X(
+            "date:T",
+            title=None,
+            scale=alt.Scale(padding=18),
+            axis=alt.Axis(format="%b %d", grid=False),
+        ),
         y=alt.Y("reviews:Q", title=None, axis=alt.Axis(grid=True, tickMinStep=1)),
         tooltip=[alt.Tooltip("date:T", title="Date"), alt.Tooltip("reviews:Q", title="Reviews")],
     )
@@ -53,7 +57,10 @@ st.altair_chart(
                 alt.GradientStop(color="rgba(91,141,239,0.45)", offset=0),
                 alt.GradientStop(color="rgba(91,141,239,0.02)", offset=1),
             ],
-            x1=1, x2=1, y1=1, y2=0,
+            x1=1,
+            x2=1,
+            y1=1,
+            y2=0,
         ),
         interpolate="monotone",
     )

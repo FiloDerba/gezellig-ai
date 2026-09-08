@@ -1,7 +1,7 @@
 [project]
-name = "ai-playground"
+name = "gezellig-ai"
 version = "0.1.0"
-description = "Playground for testing agentic frameworks, primarily pydantic-ai"
+description = "A Dutch spaced-repetition trainer with AI coaching, plus a pydantic-ai playground"
 readme = "README.md"
 authors = [
     { email = "filippo.alberton95@gmail.com" }
@@ -20,14 +20,21 @@ dependencies = [
 ]
 
 [project.scripts]
-ai-playground = "ai_playground:main"
+gezellig-ai = "ai_playground:main"
 
 [build-system]
 requires = ["uv_build>=0.9.17,<0.10.0"]
 build-backend = "uv_build"
 
+[tool.uv.build-backend]
+# The project is "gezellig-ai" but the packages under src/ are not, so the backend has to
+# be told which modules to ship instead of inferring one from the project name.
+module-name = ["ai_playground", "dutch_learning"]
+namespace = true
+
 [dependency-groups]
 dev = [
+    "pre-commit>=4.4.0",
     "pyright>=1.1.411",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",

@@ -19,12 +19,12 @@ RATING_CHOICES = [
 ]
 RATING_LABELS = dict(RATING_CHOICES)
 
-GRADUATING_INTERVAL = 1     # days after the first successful review
-EASY_FIRST_INTERVAL = 4     # days when a new card is answered Easy straight away
-SECOND_INTERVAL = 6         # days after the second successful review
-HARD_SECOND_INTERVAL = 3    # days when that second review was only Hard
-HARD_MULTIPLIER = 1.2       # applied instead of the ease factor on a Hard review
-EASY_BONUS = 1.3            # applied on top of the ease factor on an Easy review
+GRADUATING_INTERVAL = 1  # days after the first successful review
+EASY_FIRST_INTERVAL = 4  # days when a new card is answered Easy straight away
+SECOND_INTERVAL = 6  # days after the second successful review
+HARD_SECOND_INTERVAL = 3  # days when that second review was only Hard
+HARD_MULTIPLIER = 1.2  # applied instead of the ease factor on a Hard review
+EASY_BONUS = 1.3  # applied on top of the ease factor on an Easy review
 MIN_EASE_FACTOR = 1.3
 MAX_INTERVAL_DAYS = 365 * 5
 

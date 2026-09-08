@@ -16,9 +16,7 @@ def studied(make_card):
     make_card(dutch="de molen", english="the windmill", chapter="Thema03")
     ReviewLog.objects.create(word=fiets, quality=3, reviewed_on=date.today())
     ReviewLog.objects.create(word=fiets, quality=5, reviewed_on=date.today())
-    ReviewLog.objects.create(
-        word=gracht, quality=3, reviewed_on=date.today() - timedelta(days=2)
-    )
+    ReviewLog.objects.create(word=gracht, quality=3, reviewed_on=date.today() - timedelta(days=2))
     return fiets, gracht
 
 

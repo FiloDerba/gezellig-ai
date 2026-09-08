@@ -94,9 +94,11 @@ def score_pronunciation(
     media_type: str = "audio/wav",
 ) -> Pronunciation:
     """Rate a recording of the learner saying `dutch`."""
-    result = agent.run_sync([
-        f"The learner is trying to say the Dutch word '{dutch}' (meaning '{english}'). "
-        "Score the attempt and say what to change.",
-        BinaryContent(data=audio, media_type=media_type),
-    ])
+    result = agent.run_sync(
+        [
+            f"The learner is trying to say the Dutch word '{dutch}' (meaning '{english}'). "
+            "Score the attempt and say what to change.",
+            BinaryContent(data=audio, media_type=media_type),
+        ]
+    )
     return result.output

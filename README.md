@@ -1,6 +1,10 @@
-# ai-playground
+# gezellig-ai
 
-Playground for testing agentic frameworks, primarily [pydantic-ai](https://ai.pydantic.dev).
+A Dutch spaced-repetition trainer with AI coaching and pronunciation scoring, built on top of
+a [pydantic-ai](https://ai.pydantic.dev) playground.
+
+*Gezellig* is the Dutch word for the warm, sociable feeling that has no English equivalent —
+the first thing anyone learning Dutch is told is untranslatable.
 
 ## Setup
 
@@ -15,7 +19,7 @@ Starts an interactive chat loop backed by Gemini (`gemini-2.0-flash`, free tier)
 with `date` and `web_search` (Tavily) tools wired in.
 
 ```bash
-uv run ai-playground
+uv run gezellig-ai
 ```
 
 ## Dutch learning app
@@ -37,7 +41,7 @@ accent) and `data/media` (the deck's audio) resolve.
 |---|---|
 | Study | Today's session. Flip, rate, and get intervals previewed on each answer button |
 | Speaking | Say the word, record it, and have Gemini score the pronunciation |
-| Assistant | The ai-playground agent, able to search the words you have actually studied |
+| Assistant | The playground agent, able to search the words you have actually studied |
 | Progress | Review activity, upcoming load, maturity split, per-chapter breakdown |
 | Words | Filter and search the whole deck |
 | Manage | Load the sample deck, add words, see how to import Anki |
@@ -62,7 +66,7 @@ Override the model with `DUTCH_MODEL`.
 ### Assistant
 
 The **Assistant** page runs the `ai_playground` agent — the same one behind `uv run
-ai-playground`, keeping its date and web search tools — with two extra tools that read this
+gezellig-ai`, keeping its date and web search tools — with two extra tools that read this
 deck, so answers are grounded in your own vocabulary instead of Dutch in general:
 
 | Tool | Returns |
@@ -158,5 +162,26 @@ written by the study flow.
 ```bash
 uv run pytest
 uv run ruff check .
+uv run ruff format .
 uv run pyright
 ```
+
+### Pre-commit
+
+```bash
+uv run pre-commit install        # once per clone
+uv run pre-commit run --all-files
+```
+
+Hooks: the standard hygiene set (trailing whitespace, end-of-file, merge conflicts, large
+files, private keys, JSON/TOML/YAML validity), then `ruff check --fix`, `ruff format`, and
+`uv lock --check` so `pyproject.toml` and `uv.lock` cannot drift apart.
+
+This follows the same shape as the hook set in `nordics-forecasting`, but runs ruff instead of
+black + flake8 + isort. Ruff already covers all three roles here, and running both stacks would
+have them fighting over the same files — notably line length, which is 100 in this repo against
+120 there. Hook settings are read from `pyproject.toml`, so `uv run ruff ...` and the hooks can
+never disagree.
+
+Note `pre-commit run --all-files` only sees files git tracks, so a brand-new file is skipped
+until it is at least staged.

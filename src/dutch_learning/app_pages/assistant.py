@@ -82,6 +82,4 @@ with st.chat_message("assistant"):
     st.markdown(reply)
 
 st.session_state.assistant_history.extend(new_messages)
-st.session_state.assistant_turns.append(
-    {"role": "assistant", "content": reply, "tools": tools}
-)
+st.session_state.assistant_turns.append({"role": "assistant", "content": reply, "tools": tools})

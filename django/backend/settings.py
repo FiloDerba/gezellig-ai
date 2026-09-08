@@ -13,6 +13,7 @@ if not RUNNING_TESTS:
     # Real environment variables win, so docker-compose and CI still override the file.
     load_dotenv(BASE_DIR / ".env", override=False)
 
+
 def env(name: str, default: str = "") -> str:
     """Read a variable, treating a blank value as unset.
 
@@ -98,9 +99,7 @@ def _database_from_url(url: str) -> dict:
         HOST=parsed.hostname or "",
         PORT=str(parsed.port or ""),
         OPTIONS={
-            key: values[0]
-            for key, values in parse_qs(parsed.query).items()
-            if key in LIBPQ_PARAMS
+            key: values[0] for key, values in parse_qs(parsed.query).items() if key in LIBPQ_PARAMS
         },
     )
 

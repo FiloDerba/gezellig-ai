@@ -48,7 +48,7 @@ def _research_agent(model: str) -> PlaygroundAgent:
 
 
 def research_agent():
-    """The ai-playground agent, with web search plus the learner's own vocabulary."""
+    """The playground agent, with web search plus the learner's own vocabulary."""
     try:
         return _research_agent(os.environ.get("PLAYGROUND_MODEL", "gemini-3.6-flash")), None
     except Exception as exc:  # noqa: BLE001 - shown in the UI rather than breaking the page
@@ -67,6 +67,20 @@ def format_days(days: int) -> str:
 
 def daily_goal() -> int:
     return st.session_state.get("daily_goal", DEFAULT_GOAL)
+
+
+def autoplay_once(token: str) -> bool:
+    """True the first time `token` is seen, so audio fires on a new card and not on reruns.
+
+    Streamlit replays an autoplaying element every time it is recreated, which would
+    otherwise fire again on every button press.
+    """
+    if not st.session_state.get("autoplay_audio", True):
+        return False
+    if st.session_state.get("last_autoplayed") == token:
+        return False
+    st.session_state.last_autoplayed = token
+    return True
 
 
 def load_session() -> None:

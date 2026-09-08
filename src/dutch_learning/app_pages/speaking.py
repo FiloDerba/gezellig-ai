@@ -48,7 +48,10 @@ with st.container(border=True):
     reference = data.audio_path(word)
     if reference:
         st.caption("Native speaker")
-        st.audio(str(reference))
+        st.audio(
+            str(reference),
+            autoplay=shared.autoplay_once(f"speaking:{st.session_state.speaking_idx}:{word.id}"),
+        )
 
 with st.container(horizontal=True):
     if st.button("Next word", icon=":material/skip_next:"):

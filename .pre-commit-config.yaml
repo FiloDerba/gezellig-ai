@@ -1,0 +1,41 @@
+# Mirrors the hook set used in nordics-forecasting, but on ruff instead of
+# black + flake8 + isort: ruff already does all three here, and running both would mean
+# two tools fighting over the same files. Settings come from pyproject.toml, so
+# `uv run ruff ...` and the hooks below can never disagree.
+default_language_version:
+  python: python3.14
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-json
+      - id: check-toml
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: trailing-whitespace
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.3
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.9.17
+    hooks:
+      # Fails if pyproject.toml and uv.lock have drifted apart.
+      - id: uv-lock
+
+exclude: |
+  (?x)^(
+    data/.*
+    |django/staticfiles/.*
+    |.*\.apkg
+  )$

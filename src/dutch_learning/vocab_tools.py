@@ -1,6 +1,6 @@
 """Tools that let the assistant look into the learner's own vocabulary.
 
-Registered on the ai-playground agent, so answers can be grounded in the words this
+Registered on the pydantic-ai playground agent, so answers can be grounded in the words this
 learner has actually met rather than Dutch in general. The docstrings are what the model
 sees when deciding whether to call them, so they are written for the model.
 """

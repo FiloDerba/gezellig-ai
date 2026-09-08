@@ -26,6 +26,7 @@ with st.container(horizontal=True, horizontal_alignment="right"):
         st.session_state.active_goal = goal
 
         st.toggle("Reverse (English to Dutch)", key="reverse_mode")
+        st.toggle("Play audio automatically", value=True, key="autoplay_audio")
         if st.button("Restart session", icon=":material/refresh:"):
             shared.reset_session()
             st.rerun()
@@ -61,10 +62,16 @@ with st.container(border=True):
     st.title(front, text_alignment="center")
     if st.session_state.flipped:
         st.header(f":primary[{back}]", text_alignment="center")
-        if card.audio_path:
-            st.audio(str(card.audio_path))
     else:
         st.subheader(":gray[· · ·]", text_alignment="center")
+
+    # In reverse mode the recording is the answer, so it waits for the flip. Otherwise it
+    # plays as soon as the card appears, once per card rather than on every rerun.
+    if card.audio_path and (not reverse or st.session_state.flipped):
+        st.audio(
+            str(card.audio_path),
+            autoplay=shared.autoplay_once(f"study:{st.session_state.card_idx}:{word.id}"),
+        )
 
     if not card.is_new:
         st.caption(
@@ -133,9 +140,10 @@ with st.expander("Coach", icon=":material/school:"):
         if question:
             with st.spinner("Thinking..."):
                 try:
-                    st.session_state[answer_key] = (question, ai.ask(
-                        hint_agent, word.dutch, word.word_type, word.english, question
-                    ))
+                    st.session_state[answer_key] = (
+                        question,
+                        ai.ask(hint_agent, word.dutch, word.word_type, word.english, question),
+                    )
                 except Exception as exc:  # noqa: BLE001 - never lose the review over a hint
                     st.error(f"Hint failed: {exc}", icon=":material/error:")
         previous = st.session_state.get(answer_key)
