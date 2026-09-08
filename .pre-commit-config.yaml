@@ -1,7 +1,7 @@
 # Mirrors the hook set used in nordics-forecasting, but on ruff instead of
 # black + flake8 + isort: ruff already does all three here, and running both would mean
 # two tools fighting over the same files. Settings come from pyproject.toml, so
-# `uv run ruff ...` and the hooks below can never disagree.
+# `uv run ruff ..` and the hooks below can never disagree.
 default_language_version:
   python: python3.14
 
