@@ -29,8 +29,15 @@ def test_agent_runs_with_test_model():
 
 
 class ModelSelectionTests:
-    def test_bare_name_is_treated_as_gemini(self):
-        assert PlaygroundAgent("gemini-3.6-flash").agent.model.system == "google"
+    def test_default_model_uses_local_ollama(self):
+        model = PlaygroundAgent().agent.model
+        assert model.system == "openai"
+        assert model.model_name == "qwen3.6:35b-a3b"
+
+    def test_bare_model_name_uses_local_ollama(self):
+        model = PlaygroundAgent("llama3.2:3b").agent.model
+        assert model.system == "openai"
+        assert model.model_name == "llama3.2:3b"
 
     def test_a_model_instance_is_passed_through(self, agent):
         assert isinstance(agent.agent.model, TestModel)

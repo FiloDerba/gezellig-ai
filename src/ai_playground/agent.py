@@ -5,27 +5,42 @@ from datetime import date as _date
 from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai import RunContext
 from pydantic_ai.models import Model
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
 from tavily import TavilyClient
 
 from ai_playground.prompts import goal, instructions, knowledge, role
+
+DEFAULT_MODEL = "qwen3.6:35b-a3b"
+OLLAMA_BASE_URL = "http://localhost:11434/v1"
 
 
 class Agent:
     def __init__(
         self,
-        model: str | Model = "gemini-3.6-flash",
+        model_name: str | Model = DEFAULT_MODEL,
         extra_context: str = "",
         extra_tools: Sequence[Callable] = (),
     ):
         """`extra_context` is appended to the system prompt, for app-specific knowledge.
 
         `extra_tools` are plain functions registered alongside the built-in ones, which is
-        how a host application gives the agent access to its own data.
+        how a host application gives the agent access to its own data. Bare model names use
+        the local Ollama server; provider-qualified names and Model instances pass through.
         """
         self.name = "Pydantic Agent"
-        if isinstance(model, str) and ":" not in model:
-            # Bare names mean Gemini; a qualified name or a Model instance is passed through.
-            model = f"google:{model}"
+        if isinstance(model_name, str):
+            provider_name = model_name.partition(":")[0]
+            if provider_name in {"anthropic", "google", "openai"}:
+                model: str | Model = model_name
+            else:
+                provider = OpenAIProvider(
+                    base_url=os.getenv("OLLAMA_BASE_URL") or OLLAMA_BASE_URL,
+                    api_key=os.getenv("OLLAMA_API_KEY") or "ollama",
+                )
+                model = OpenAIChatModel(model_name, provider=provider)
+        else:
+            model = model_name
         self.agent = PydanticAgent(
             model,
             system_prompt="\n".join(

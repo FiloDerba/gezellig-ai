@@ -4,7 +4,7 @@ import os
 
 import streamlit as st
 
-from ai_playground.agent import Agent as PlaygroundAgent
+from ai_playground.agent import DEFAULT_MODEL, Agent as PlaygroundAgent
 from dutch_learning import ai, data, vocab_tools
 
 DAILY_GOALS = [10, 20, 30, 50, 100]
@@ -50,7 +50,7 @@ def _research_agent(model: str) -> PlaygroundAgent:
 def research_agent():
     """The playground agent, with web search plus the learner's own vocabulary."""
     try:
-        return _research_agent(os.environ.get("PLAYGROUND_MODEL", "gemini-3.6-flash")), None
+        return _research_agent(os.environ.get("PLAYGROUND_MODEL", DEFAULT_MODEL)), None
     except Exception as exc:  # noqa: BLE001 - shown in the UI rather than breaking the page
         return None, str(exc)
 

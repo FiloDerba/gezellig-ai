@@ -10,13 +10,19 @@ the first thing anyone learning Dutch is told is untranslatable.
 
 ```bash
 uv sync
-cp .env.example .env   # fill in GOOGLE_API_KEY (free tier: https://aistudio.google.com/apikey) and TAVILY_API_KEY
+cp .env.example .env
+ollama pull qwen3.6:35b-a3b
 ```
+
+The playground uses Ollama at `http://localhost:11434/v1` by default. Set `PLAYGROUND_MODEL`
+to the name of a model you have installed in Ollama, or set `OLLAMA_BASE_URL` for a different
+local endpoint. `TAVILY_API_KEY` enables web search. The Dutch learning app's tutor and
+pronunciation features still use Gemini and need `GOOGLE_API_KEY`.
 
 ## Run
 
-Starts an interactive chat loop backed by Gemini (`gemini-2.0-flash`, free tier),
-with `date` and `web_search` (Tavily) tools wired in.
+Starts an interactive chat loop backed by your local Ollama model, with `date` and
+`web_search` (Tavily) tools wired in.
 
 ```bash
 uv run gezellig-ai
