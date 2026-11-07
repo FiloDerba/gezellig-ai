@@ -4,7 +4,8 @@ import os
 
 import streamlit as st
 
-from ai_playground.agent import DEFAULT_MODEL, Agent as PlaygroundAgent
+from ai_playground.agent import DEFAULT_MODEL
+from ai_playground.agent import Agent as PlaygroundAgent
 from dutch_learning import ai, data, vocab_tools
 
 DAILY_GOALS = [10, 20, 30, 50, 100]

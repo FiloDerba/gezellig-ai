@@ -6,6 +6,11 @@ from vocabulary.srs import MATURE_INTERVAL_DAYS, RATING_CHOICES
 
 
 class Word(models.Model):
+    # Declared for django-types: Django adds these at runtime, the stubs can't see them.
+    id: int
+    srs: SrsState
+    reviews: models.Manager[ReviewLog]
+
     dutch = models.CharField(max_length=200)
     english = models.CharField(max_length=300)
     word_type = models.CharField(max_length=50, blank=True)

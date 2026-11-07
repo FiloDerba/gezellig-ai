@@ -1,5 +1,6 @@
 import pytest
 from pydantic_ai import Agent
+from pydantic_ai.models import Model
 from pydantic_ai.models.test import TestModel
 
 from ai_playground.agent import Agent as PlaygroundAgent
@@ -31,11 +32,13 @@ def test_agent_runs_with_test_model():
 class ModelSelectionTests:
     def test_default_model_uses_local_ollama(self):
         model = PlaygroundAgent().agent.model
+        assert isinstance(model, Model)
         assert model.system == "openai"
         assert model.model_name == "qwen3.6:35b-a3b"
 
     def test_bare_model_name_uses_local_ollama(self):
         model = PlaygroundAgent("llama3.2:3b").agent.model
+        assert isinstance(model, Model)
         assert model.system == "openai"
         assert model.model_name == "llama3.2:3b"
 

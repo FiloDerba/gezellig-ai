@@ -1,15 +1,19 @@
+from typing import Literal
+
 import streamlit as st
 
 from dutch_learning import ai, data, shared
 
-SCORE_BANDS = [
+Colour = Literal["green", "orange", "red"]
+
+SCORE_BANDS: list[tuple[int, Colour, str]] = [
     (85, "green", "Native-ish"),
     (65, "orange", "Understandable"),
     (0, "red", "Keep at it"),
 ]
 
 
-def _band(score: int) -> tuple[str, str]:
+def _band(score: int) -> tuple[Colour, str]:
     for threshold, colour, label in SCORE_BANDS:
         if score >= threshold:
             return colour, label

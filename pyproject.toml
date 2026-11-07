@@ -34,6 +34,7 @@ namespace = true
 
 [dependency-groups]
 dev = [
+    "django-types>=0.24.0",
     "pre-commit>=4.4.0",
     "pyright>=1.1.411",
     "pytest>=9.1.1",
@@ -63,5 +64,6 @@ python_classes = ["Test*", "*Tests"]
 
 [tool.pyright]
 include = ["src", "tests"]
+extraPaths = ["django"]  # same as pytest's pythonpath, so `vocabulary` resolves
 venvPath = "."
 venv = ".venv"
