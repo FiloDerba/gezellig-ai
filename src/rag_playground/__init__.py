@@ -15,7 +15,8 @@ def main() -> None:
     index = load_index()
     agent = rag.agentic(index) if args.agentic else None
 
-    print(f"{'Agentic' if args.agentic else 'Two-step'} RAG over {len(index.chunks)} chunks.")
+    mode = "Agentic" if args.agentic else "Two-step"
+    print(f"{mode} RAG over {len(index.chunks)} chunks ({index.store}).")
     while True:
         query = input("You: ")
         if query.lower() in ("exit", "quit"):
