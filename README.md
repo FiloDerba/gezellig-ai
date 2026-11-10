@@ -28,6 +28,25 @@ Starts an interactive chat loop backed by your local Ollama model, with `date` a
 uv run gezellig-ai
 ```
 
+## RAG playground
+
+Ask questions about a long local document, here a D&D campaign summary, with everything
+running on Ollama. Put the `.docx` in the git-ignored `data/rag/` folder (see `RAG_DOC`).
+
+```bash
+ollama pull bge-m3
+uv run rag-playground             # two-step: always retrieve 5 chunks, then answer
+uv run rag-playground --agentic   # the model calls search_campaign when and as often as it wants
+```
+
+The document is split on its heading styles and packed into ~300-word chunks that start with
+their chapter title. The first run embeds them (a minute or two) into
+`data/rag/<name>.index.npz`; later runs reuse that until the file or `RAG_EMBED_MODEL` changes.
+Search is cosine similarity in numpy. Both modes print which chapters were retrieved, so you
+can see why an answer came out the way it did. Two-step answers each question on its own;
+agentic keeps the conversation. `loader.py` knows this document's heading style names
+(`SamKop`, `Samkop2`); change them there for another document.
+
 ## Dutch learning app
 
 A spaced-repetition vocabulary trainer with AI coaching and pronunciation scoring.

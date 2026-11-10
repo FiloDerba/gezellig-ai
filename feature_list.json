@@ -1,6 +1,6 @@
 {
   "project": "gezellig-ai",
-  "last_updated": "2026-11-07",
+  "last_updated": "2026-11-10",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -28,6 +28,23 @@
         "2026-11-07: ./init.sh exit 0. ruff check clean; 49 files formatted; pyright 0 errors; pytest 101 passed; makemigrations --check: no changes."
       ],
       "notes": "Fixed: import order (shared.py); pyright extraPaths=['django']; django-types dev stubs + declared id/srs/reviews on Word; Literal colour in speaking.py; isinstance(Model) narrowing in tests/test_agent.py."
+    },
+    {
+      "id": "rag-001",
+      "priority": 2,
+      "area": "rag_playground",
+      "title": "RAG playground: two-step and agentic RAG over the campaign summary",
+      "user_visible_behavior": "`uv run rag-playground` answers questions from data/rag/*.docx using local Ollama models; `--agentic` lets the model call search_campaign itself. Both show the chapters retrieved.",
+      "status": "passing",
+      "verification": [
+        "Run ./init.sh.",
+        "Run `uv run rag-playground` and `uv run rag-playground --agentic` against the real document and check the retrieved chapters match the question."
+      ],
+      "evidence": [
+        "2026-11-10: ./init.sh exit 0 (see claude-progress.md session 002 for counts).",
+        "2026-11-10: real run, bge-m3 + PLAYGROUND_MODEL. 657 chunks embedded. Two-step: 'What was the Shattering?' retrieved 'History of Aeloria > The shattering'; 'Who is Salazar the Lavender?' retrieved Chapter 41. Agentic: a question spanning chapters 6-8 triggered 3 search_campaign calls; 'Who is Kallista?' triggered 1."
+      ],
+      "notes": "Answers were not fact-checked against the story by a human. Not built yet: hybrid/keyword search, reranking, chunk overlap, an eval question set."
     }
   ]
 }

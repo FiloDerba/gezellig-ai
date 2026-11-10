@@ -64,6 +64,7 @@ Python 3.14, managed with `uv` (one `pyproject.toml`, one `uv.lock`, one `.venv`
 | Area | Path | What it is | Entry point |
 |---|---|---|---|
 | AI playground | `src/ai_playground/` | pydantic-ai chat agent (local Ollama by default) with `date` + Tavily `web_search` tools. Accepts `extra_context` / `extra_tools` so hosts can extend it. | `uv run gezellig-ai` |
+| RAG playground | `src/rag_playground/` | Two-step and agentic RAG over a local document (git-ignored `data/rag/`), embedded with a local Ollama model and searched with numpy. | `uv run rag-playground [--agentic]` |
 | Dutch trainer UI | `src/dutch_learning/` | Streamlit app: spaced-repetition study, AI coach, pronunciation scoring (Gemini), assistant page. No business logic here. | `uv run streamlit run streamlit_app.py` |
 | Dutch trainer backend | `django/` | Django used **as a library** (ORM + admin), not a server. `vocabulary/` holds models, SM-2 (`srs.py`), reads (`selectors.py`), writes (`services.py`), Anki import. | `django/manage.py` |
 | Tests | `tests/` (app/agent), `django/**/test_*.py` | pytest | `uv run pytest` |
@@ -72,6 +73,8 @@ Seams between areas:
 - `dutch_learning` -> `ai_playground`: the Assistant page passes `extra_context`/`extra_tools`
   (`dutch_learning/vocab_tools.py`) into `ai_playground.Agent`. The playground knows nothing
   about Dutch.
+- `rag_playground` -> `ai_playground`: agentic mode passes a `search_campaign` tool through
+  the same `extra_context`/`extra_tools` seam (`rag_playground/rag.py`).
 - `dutch_learning` -> `django`: `django_bootstrap.py` configures Django in-process;
   `data.py` is the only adapter the pages use.
 
@@ -86,7 +89,8 @@ Seams between areas:
 ## Config
 
 Root `.env` (see `.env.example`): `PLAYGROUND_MODEL`, `OLLAMA_BASE_URL`, `GOOGLE_API_KEY`
-(Dutch AI features; they degrade gracefully without it), `TAVILY_API_KEY`, `DUTCH_MODEL`.
+(Dutch AI features; they degrade gracefully without it), `TAVILY_API_KEY`, `DUTCH_MODEL`,
+`RAG_EMBED_MODEL`, `RAG_DOC`.
 `django/.env` (see `django/example.env`): `DATABASE_URL` (Postgres/Neon) or default SQLite
 `django/db.sqlite3`. Tests always use SQLite. Run the app from the repo root (it needs
 `.streamlit/config.toml` and `data/media`).
