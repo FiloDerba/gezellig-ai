@@ -56,3 +56,10 @@ before handoff (see `AGENTS.md`).
   `uv run pre-commit install` on this machine; `.github/workflows/ci.yml` running `./init.sh`;
   AGENTS.md now says to commit on a branch.
 - Known risk: the pre-commit hook is per clone and has to be installed again after a fresh clone.
+
+### Session 002 (continued): learning notes
+
+- Added `docs/ai-learning-checklist.md` (moved from a Google Doc, with added points marked)
+  and `docs/ai-engineering-wiki.md` (notes on RAG, embeddings, tool calling, RAG vs
+  fine-tuning, and the model timing comparison). Docs only, no code change.
+- Local-only: `.env` now sets `PLAYGROUND_MODEL=gemma4:e4b`.
