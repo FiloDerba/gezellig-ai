@@ -32,6 +32,8 @@ anything you want to revisit.
       → [wiki](ai-engineering-wiki.md#embeddings-and-vector-search)
 - [x] Compare embedding models: dimensions, max input length, languages *(added)*
       → [wiki](ai-engineering-wiki.md#embedding-models)
+- [x] Put the vectors in a vector database (LanceDB) *(added)*
+      → [wiki](ai-engineering-wiki.md#vector-databases)
 - [x] Chunking: size, overlap, splitting on document structure *(added)*
       → [wiki](ai-engineering-wiki.md#chunking)
 - [x] RAG vs fine-tuning → [wiki](ai-engineering-wiki.md#rag-vs-fine-tuning)
@@ -91,4 +93,4 @@ anything you want to revisit.
 
 | Date | What I did | What I learned |
 |---|---|---|
-| 2026-11-10 | Built `src/rag_playground/`: two-step and agentic RAG over my 161k-word D&D campaign summary, on local Ollama models. Timed gemma against qwen. Added a PR rule, CI and pre-commit to the repo. | Retrieval is cheap, the chat model is the slow part. A small fast model answers simple lookups fine but searches once and stops on questions that span chapters. 657 vectors need no vector database. RAG is for facts, fine-tuning is for behaviour. |
+| 2026-11-10 | Built `src/rag_playground/`: two-step and agentic RAG over my 161k-word D&D campaign summary, on local Ollama models. Timed gemma against qwen. Moved the vectors into LanceDB with numpy as fallback. Added a PR rule, CI and pre-commit to the repo. | Retrieval is cheap, the chat model is the slow part. A small fast model answers simple lookups fine but searches once and stops on questions that span chapters. 657 vectors need no vector database. RAG is for facts, fine-tuning is for behaviour. |

@@ -262,8 +262,17 @@ Reach for one when you need:
 Light options that run without a server: Chroma, LanceDB. If you already run Postgres:
 pgvector.
 
-*In this repo:* no vector database. Vectors and chunk texts live in one `.npz` file, rebuilt
-when the document or the embedding model changes.
+**A model is not a database.** The embedding model and the chat model *compute*: text in,
+vector or answer out, and they hold none of your data. The vector database *stores* your
+vectors and looks them up, with no intelligence of its own. Swapping the database changes
+speed and features, never the answers.
+
+*In this repo:* the vectors are cached in one `.npz` file and loaded into a LanceDB table
+(a folder on disk, no server) at startup. `RAG_STORE=numpy` skips the database and searches
+the same vectors in numpy. Measured on the 657 campaign chunks: both return identical
+results, the table builds in 15 ms and a search takes 8 ms. So at this size the database
+adds no speed or quality; what it adds is a `section` column to filter on and built-in
+keyword search for the hybrid experiment.
 
 ## Hybrid search and reranking
 
@@ -370,7 +379,9 @@ Useful commands: `ollama list` (installed), `ollama ps` (loaded right now),
 
 1. Write about 10 campaign questions with known answers, as an eval set. Without it,
    "better" is a guess.
-2. Add hybrid (keyword + vector) search and check it on invented names.
+2. Add hybrid (keyword + vector) search with LanceDB's keyword index and check it on
+   invented names.
 3. Add chunk overlap and see whether "ends mid-scene" answers go away.
 4. Try a reranker.
 5. Prompt the small model to search more than once on multi-part questions.
+6. Filter searches by chapter using the `section` column in the LanceDB table.
