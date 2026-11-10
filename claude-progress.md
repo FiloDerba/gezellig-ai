@@ -56,3 +56,18 @@ before handoff (see `AGENTS.md`).
   `uv run pre-commit install` on this machine; `.github/workflows/ci.yml` running `./init.sh`;
   AGENTS.md now says to commit on a branch.
 - Known risk: the pre-commit hook is per clone and has to be installed again after a fresh clone.
+
+### Session 002 (continued): LanceDB
+
+- Goal: put the RAG vectors in a vector database, keeping numpy as a fallback (`rag-002`).
+- Completed: `lancedb` dependency; `rag_playground/index.py` builds a LanceDB table from the
+  `.npz` cache and searches it; `RAG_STORE=numpy` keeps the old path; startup line names the
+  store; README, AGENTS.md, `.env.example` updated.
+- Verification run: `./init.sh` exit 0, pytest 110 passed. Both stores return identical
+  chunks on the real index (see `rag-002` evidence).
+- Local-only state: `data/rag/*.lancedb` folder (git-ignored); `.env` sets
+  `PLAYGROUND_MODEL=gemma4:e4b`.
+- Branches not pushed at end of session: `add-lancedb` (this work) and `add-ai-notes`
+  (`docs/` checklist and wiki). Each needs its own PR; `main` is protected.
+- Next best step: an eval set of ~10 campaign questions, then hybrid search using LanceDB's
+  built-in keyword index.

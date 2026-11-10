@@ -42,7 +42,10 @@ uv run rag-playground --agentic   # the model calls search_campaign when and as 
 The document is split on its heading styles and packed into ~300-word chunks that start with
 their chapter title. The first run embeds them (a minute or two) into
 `data/rag/<name>.index.npz`; later runs reuse that until the file or `RAG_EMBED_MODEL` changes.
-Search is cosine similarity in numpy. Both modes print which chapters were retrieved, so you
+Search is cosine similarity over all chunks, run in a [LanceDB](https://lancedb.com) table
+(`data/rag/<name>.lancedb`, rebuilt from the `.npz` at each start). Set `RAG_STORE=numpy` to
+skip the database and search the same vectors directly in numpy; both return the same chunks,
+and the startup line says which one is in use. Both modes print which chapters were retrieved, so you
 can see why an answer came out the way it did. Two-step answers each question on its own;
 agentic keeps the conversation. `loader.py` knows this document's heading style names
 (`SamKop`, `Samkop2`); change them there for another document.

@@ -62,6 +62,23 @@
         "2026-11-10: ruleset 26983810 updated; rules on main: deletion, non_fast_forward, pull_request, required_status_checks (context 'checks')."
       ],
       "notes": "Ruleset 'protect-main' (id 26983810) on GitHub; 0 required approvals because the repo has one contributor."
+    },
+    {
+      "id": "rag-002",
+      "priority": 4,
+      "area": "rag_playground",
+      "title": "RAG playground searches in a LanceDB vector database, numpy as fallback",
+      "user_visible_behavior": "`uv run rag-playground` searches a LanceDB table by default; `RAG_STORE=numpy` searches the same vectors in numpy. The startup line names the store. Both return the same chunks.",
+      "status": "passing",
+      "verification": [
+        "Run ./init.sh.",
+        "Run the playground with RAG_STORE=lancedb and RAG_STORE=numpy and check the same sections are retrieved."
+      ],
+      "evidence": [
+        "2026-11-10: ./init.sh exit 0, pytest 110 passed (4 new, including a lancedb-vs-numpy order test).",
+        "2026-11-10: real index, 657 rows. Same top-5 chunks from both stores on 8 of 8 real questions, and on 200 of 200 chunk vectors used as queries. Table build 15 ms, search 8 ms."
+      ],
+      "notes": "lancedb 0.41.0 on Python 3.14. No ANN index is created, so the search is exact. Not built: metadata filter by chapter (the table has a `section` column ready), hybrid keyword search, incremental adds."
     }
   ]
 }

@@ -1,12 +1,13 @@
 import zipfile
 
 import numpy as np
+import pytest
 from pydantic_ai import Embedder
 from pydantic_ai.embeddings import TestEmbeddingModel
 from pydantic_ai.models.test import TestModel
 
 from rag_playground import loader, rag
-from rag_playground.index import Index, load_index, top_k
+from rag_playground.index import Index, lance_table, load_index, top_k
 
 NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
@@ -55,15 +56,33 @@ def test_top_k_orders_by_similarity():
     assert top_k(vectors, np.array([0.0, 1.0], dtype=np.float32), 2) == [1, 2]
 
 
-def test_load_index_embeds_once_then_reuses_the_cache(tmp_path, capsys):
+@pytest.mark.parametrize("store", ["lancedb", "numpy"])
+def test_load_index_embeds_once_then_reuses_the_cache(tmp_path, capsys, store):
     doc = make_docx(tmp_path / "c.docx", DOC)
     embedder = Embedder(TestEmbeddingModel())
-    first = load_index(doc, embedder)
+    first = load_index(doc, embedder, store)
     assert "Embedded 2 chunks" in capsys.readouterr().out
-    second = load_index(doc, embedder)
+    second = load_index(doc, embedder, store)
     assert capsys.readouterr().out == ""
+    assert second.store == store
     assert second.chunks == first.chunks
     assert len(second.search("temple", k=1)) == 1
+
+
+def test_load_index_rejects_an_unknown_store(tmp_path):
+    with pytest.raises(ValueError, match="RAG_STORE"):
+        load_index(make_docx(tmp_path / "c.docx", DOC), Embedder(TestEmbeddingModel()), "redis")
+
+
+def test_lancedb_and_numpy_return_the_same_chunks_in_the_same_order(tmp_path):
+    # TestEmbeddingModel embeds every query as all ones, so "near" means close to that.
+    raw = np.eye(8, dtype=np.float32)[:4] + np.array([[0.9], [0.1], [0.5], [0.3]], dtype=np.float32)
+    vectors = raw / np.linalg.norm(raw, axis=1, keepdims=True)
+    chunks = [f"Section {i}\ntext {i}" for i in range(4)]
+    embedder = Embedder(TestEmbeddingModel())
+    in_numpy = Index(chunks, vectors, embedder).search("anything", k=3)
+    in_lancedb = Index(chunks, vectors, embedder, lance_table(tmp_path / "db", chunks, vectors))
+    assert in_lancedb.search("anything", k=3) == in_numpy == [chunks[0], chunks[2], chunks[3]]
 
 
 def test_sources_lists_each_section_once():
