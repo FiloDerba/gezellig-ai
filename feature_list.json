@@ -52,12 +52,15 @@
       "area": "tooling",
       "title": "Pull requests into main are required and checked by CI",
       "user_visible_behavior": "main only changes through a pull request, and every pull request runs ./init.sh on GitHub Actions.",
-      "status": "in_progress",
+      "status": "passing",
       "verification": [
         "Open a pull request and verify the 'checks' job runs ./init.sh and passes.",
         "Verify `gh ruleset check main` lists pull_request and required_status_checks."
       ],
-      "evidence": [],
+      "evidence": [
+        "2026-11-10: PR #1, CI run 42907492356: 'checks' job ran ./init.sh and passed in 26s.",
+        "2026-11-10: ruleset 26983810 updated; rules on main: deletion, non_fast_forward, pull_request, required_status_checks (context 'checks')."
+      ],
       "notes": "Ruleset 'protect-main' (id 26983810) on GitHub; 0 required approvals because the repo has one contributor."
     }
   ]
