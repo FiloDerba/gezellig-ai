@@ -48,7 +48,9 @@ Before ending a session:
 1. Update `claude-progress.md`.
 2. Update `feature_list.json`.
 3. Record any unresolved risk or blocker.
-4. Commit with a descriptive message once the work is in a safe state.
+4. Commit on a branch with a descriptive message once the work is in a safe state. `main` is
+   protected on GitHub: changes reach it only through a pull request, which must pass the
+   `checks` CI job (`.github/workflows/ci.yml`, runs `./init.sh`).
 5. Leave the repo clean enough for the next session to run `./init.sh` immediately.
 
 ## What this repo is
@@ -106,6 +108,7 @@ cd django && uv run --project .. python manage.py <cmd>   # migrate, import_anki
 ```
 
 Pre-commit runs ruff + `uv lock --check`; keep `pyproject.toml` and `uv.lock` in sync.
+Run `uv run pre-commit install` once per clone to activate the hooks.
 
 ## Conventions
 
