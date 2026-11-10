@@ -30,6 +30,8 @@ anything you want to revisit.
   - [ ] Knowledge graph
 - [x] Learn embeddings and vector search
       → [wiki](ai-engineering-wiki.md#embeddings-and-vector-search)
+- [x] Compare embedding models: dimensions, max input length, languages *(added)*
+      → [wiki](ai-engineering-wiki.md#embedding-models)
 - [x] Chunking: size, overlap, splitting on document structure *(added)*
       → [wiki](ai-engineering-wiki.md#chunking)
 - [x] RAG vs fine-tuning → [wiki](ai-engineering-wiki.md#rag-vs-fine-tuning)

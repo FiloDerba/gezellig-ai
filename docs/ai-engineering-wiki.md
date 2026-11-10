@@ -10,6 +10,7 @@ Last updated: 2026-11-10.
 
 - [Tool calling](#tool-calling)
 - [Embeddings and vector search](#embeddings-and-vector-search)
+- [Embedding models](#embedding-models)
 - [Chunking](#chunking)
 - [RAG](#rag)
 - [Two-step against agentic RAG](#two-step-against-agentic-rag)
@@ -66,6 +67,123 @@ is much smaller and faster.
 
 *In this repo:* `bge-m3` through Ollama, 1,024 numbers per chunk, called with pydantic-ai's
 `Embedder`. Embedding 657 chunks took about a minute, once. See `rag_playground/index.py`.
+
+## Embedding models
+
+Embedding models differ on a handful of practical properties. The first two are explained in
+detail below because they shape the whole index.
+
+| Property | What it means | Why it matters |
+|---|---|---|
+| Dimensions | How many numbers per vector (384 to 3,072) | More can capture finer meaning, but takes more storage and slower search |
+| Max input length | How much text fits in one call (256 to 32,000 tokens) | Anything longer is silently cut off, so it caps your chunk size |
+| Languages | English-only or multilingual | An English-only model does poorly on Dutch |
+| Model size | About 50 MB to several GB | Indexing speed, and whether it fits next to the chat model |
+| Prefixes / instructions | Some need `search_query:` or a task instruction before the text | Forgetting them quietly hurts quality |
+| Shortenable vectors ("Matryoshka") | You may keep only the first 256 or 512 numbers | A smaller index for little quality loss |
+| Output type | Dense (one vector), sparse (keyword-like weights), multi-vector (one per token) | Sparse and multi-vector do better on exact names |
+| Modality | Text only, or text plus images | Needed to search figures, screenshots, maps |
+
+### Dimensions
+
+The model turns every text into a list of numbers of a **fixed length**, and that length is
+the dimension count. `bge-m3` always returns 1,024 numbers, whether the input is one word or
+a full page.
+
+Each number is a position along one direction the model learned during training. No single
+direction has a readable meaning like "is about dragons"; the meaning is in the combination.
+Think of describing a person: with 3 numbers (height, weight, age) many different people
+look identical, with 100 numbers far fewer do. More dimensions give the model more room to
+keep two different meanings apart.
+
+What it costs is plain arithmetic, at 4 bytes per number:
+
+| Chunks | 384 dims | 1,024 dims | 3,072 dims |
+|---|---|---|---|
+| 657 (the campaign) | 1.0 MB | 2.7 MB | 8.1 MB |
+| 1 million | 1.5 GB | 4.1 GB | 12.3 GB |
+
+Search time grows the same way, because comparing two vectors means multiplying every pair
+of numbers.
+
+- **At small scale it does not matter.** The campaign index is 2.7 MB at 1,024 dimensions.
+  Dimensions become a real decision at hundreds of thousands of chunks.
+- **More is not automatically better.** Dimensions are room, not quality. A well-trained
+  768-dimension model can beat a weaker 3,072-dimension one. Compare models on a benchmark
+  or your own questions, never on dimension count.
+- **The count is fixed per model**, so every vector in an index has the same length, and
+  vectors from two different models can never be mixed.
+- **Shortenable models** are trained so the first numbers carry the most meaning. You can
+  keep the first 256 of 1,024 and lose only a little quality. Cutting an ordinary model's
+  vectors that way ruins them.
+
+### Max input length
+
+An embedding model reads its input in tokens and has a hard limit on how many it can take.
+Text past the limit is **dropped without an error**: Ollama truncates by default. The
+vector then describes only the start of the chunk.
+
+Why that is a nasty failure: the full chunk text is still stored and still shown to the chat
+model when it is retrieved. Nothing looks wrong. The chunk simply can no longer be *found*
+by anything in its cut-off tail.
+
+Measured on the campaign chunks with `bge-m3`:
+
+| Chunk | Words | Tokens |
+|---|---|---|
+| Typical (median) | 249 | 397 |
+| Large (90th percentile) | 358 | 513 |
+| Longest | 700 | 995 |
+
+That is about 1.4 to 1.6 tokens per word, more than the usual estimate of 1.3. Invented
+names split into several tokens each.
+
+What each limit would do to these 657 chunks:
+
+| Model limit | Chunks cut off |
+|---|---|
+| 256 tokens (`all-minilm`) | about 564 (86%) |
+| 512 tokens (`mxbai-embed-large`) | about 100 (15%) |
+| 2,048 or 8,192 tokens | none |
+
+- **Check the limit against your real chunks**, in tokens, not words, before picking a model.
+- **Changing to a model with a shorter limit means re-chunking**, not only re-embedding.
+- **The limit is a ceiling, not a target.** `bge-m3` accepts 8,192 tokens, but a whole
+  chapter squeezed into 1,024 numbers gives a blurry vector that matches everything a
+  little and nothing well. This is the link between the two properties: the vector is the
+  same size however much text goes in, so small focused chunks get sharper vectors.
+
+### Models to know
+
+Figures are from memory and the field moves fast; check the model page before relying on
+one.
+
+Local, through Ollama:
+
+| Model | Dimensions | Max input | Notes |
+|---|---|---|---|
+| `all-minilm` | 384 | 256 | Tiny and very fast. Fine for demos. |
+| `nomic-embed-text` | 768 | 8,192 | Small, good for English. Needs the prefixes. |
+| `mxbai-embed-large` | 1,024 | 512 | Strong on English, short input limit. |
+| `bge-m3` | 1,024 | 8,192 | Multilingual, no prefixes. Used in this repo. |
+| `embeddinggemma` | 768 | 2,048 | Google's small model for laptops and phones. Shortenable. |
+| `qwen3-embedding` | 1,024 to 4,096 | 32,000 | Three sizes. Among the strongest open models. |
+
+Hosted, through an API: OpenAI `text-embedding-3-small` / `-large`, Google
+`gemini-embedding-001`, Voyage AI (also specialised models for code, law, finance; Anthropic
+has no embedding model and points to Voyage), Cohere `embed-v4` (text and images), Jina,
+Mistral. Often a little better and nothing to run locally, but the text leaves your machine
+and you pay per token.
+
+### Choosing one
+
+1. Check the hard limits: your languages, and a max input above your largest chunk.
+2. Use the MTEB leaderboard on Hugging Face for a shortlist. The top changes every few
+   months.
+3. Test the shortlist on your own questions. Benchmark rank often does not carry over to a
+   specific corpus, especially one full of invented names.
+
+*In this repo:* changing model is one setting, `RAG_EMBED_MODEL`, plus a one-minute re-index.
 
 ## Chunking
 
