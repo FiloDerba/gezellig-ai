@@ -48,3 +48,11 @@ before handoff (see `AGENTS.md`).
   campaign. Agentic mode still has the playground's web search tool available.
 - Next best step: write 10 questions with known answers as an eval set, then try hybrid
   (keyword + vector) search and compare.
+
+### Session 002 (continued): PR flow and CI
+
+- Goal: require pull requests into `main` and check them automatically (`ci-001`).
+- Completed: GitHub ruleset `protect-main` (pull request required, no force push, no delete);
+  `uv run pre-commit install` on this machine; `.github/workflows/ci.yml` running `./init.sh`;
+  AGENTS.md now says to commit on a branch.
+- Known risk: the pre-commit hook is per clone and has to be installed again after a fresh clone.
