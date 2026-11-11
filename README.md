@@ -49,7 +49,11 @@ Search is cosine similarity over all chunks, run in a [LanceDB](https://lancedb.
 skip the database and search the same vectors directly in numpy; both return the same chunks,
 and the startup line says which one is in use. `--hybrid` adds LanceDB's keyword (BM25)
 search and merges it with the vector results, which finds rare invented names that the
-embedding model misses; it needs the LanceDB store. Both modes print which chapters were retrieved, so you
+embedding model misses; it needs the LanceDB store. `--graph` (with `--agentic`) has a
+local chat model (`RAG_GRAPH_MODEL`) read every chunk once and write down the relations
+between named things into `data/rag/<name>.graph.json`, about two hours for this campaign;
+an interrupted build continues where it stopped. The model then gets a `campaign_relations`
+tool to look a name up. Both modes print which chapters were retrieved, so you
 can see why an answer came out the way it did. Two-step answers each question on its own;
 agentic keeps the conversation. `loader.py` knows this document's heading style names
 (`SamKop`, `Samkop2`); change them there for another document.

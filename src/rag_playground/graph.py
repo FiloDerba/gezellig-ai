@@ -50,7 +50,8 @@ def extractor(model: Model | str | None = None) -> Extractor:
     if not isinstance(model, Model):
         name = model or os.getenv("RAG_GRAPH_MODEL") or DEFAULT_MODEL
         model = OpenAIChatModel(name, provider=ollama())
-    # Thinking off: measured 3 s a chunk against 40 s and more with it on, with cleaner output.
+    # Thinking off: about 11 s a chunk over the whole campaign, against 40 s and more with it
+    # on in a trial, and with cleaner output.
     # shortcut: assumes an Ollama model that accepts this setting; drop it for other providers.
     settings = ModelSettings(extra_body={"reasoning_effort": "none"})
     return Agent(model, system_prompt=PROMPT, output_type=list[Relation], model_settings=settings)

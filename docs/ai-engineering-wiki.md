@@ -438,6 +438,25 @@ That is much more model work at indexing time.
 demonstrably fails on. Keep the search: the graph says *that* two things are related and
 where, the passages say *what happened*.
 
+*In this repo:* `uv run rag-playground --agentic --graph`, a small version: triples in a
+JSON file, looked up by name through a `campaign_relations` tool, with no graph database and
+no cluster summaries (`rag_playground/graph.py`). What building it on the campaign showed:
+
+- **The model matters more than anything.** `gemma4:e4b` failed on 2 of 3 trial chunks.
+  `qwen3.8:27b` worked at 36 to 52 seconds a chunk. `qwen3.6:35b-a3b` with thinking switched
+  off gave cleaner relations and was much faster, so it builds the graph.
+- **Cost:** 118 minutes for 657 chunks, against about one minute to embed them. 23 chunks
+  (3.5%) were skipped because the model's output was unusable.
+- **Result:** 1,251 relations between 619 distinct names.
+- **It adds breadth.** Asked "who is connected to the city of Kallista?", the search alone
+  answered from 3 sections. With the graph the answer also named the governor, a resident
+  and a faction based there, facts that sit in other sections.
+- **It is not always needed.** "How are Cevan and Vecna connected?" was answered correctly
+  with and without the graph.
+- **The noise is real.** One villain appears as "Cevan", "Lord Cevan", "Vecna" and "Vecna
+  the Undying", as four separate names. Some relations are wrong: a world-building section
+  has no narrator, yet the graph says the narrator slew a dragon god there.
+
 ## RAG vs fine-tuning
 
 **RAG gives the model facts to read at question time. Fine-tuning changes how the model

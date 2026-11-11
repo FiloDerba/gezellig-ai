@@ -8,7 +8,7 @@ before handoff (see `AGENTS.md`).
 - Repository root: `gezellig-ai/`
 - Standard startup path: `uv run streamlit run streamlit_app.py` (or `RUN_START_COMMAND=1 ./init.sh`)
 - Standard verification path: `./init.sh` (uv sync, ruff check, ruff format --check, pyright, pytest)
-- Current highest-priority unfinished feature: none recorded; next idea is a RAG eval set, then reranking (see session 003)
+- Current highest-priority unfinished feature: none recorded; next idea is a RAG eval set (see session 004)
 - Current blocker: none (`./init.sh` passes)
 
 ## Session Log
@@ -100,3 +100,23 @@ before handoff (see `AGENTS.md`).
 - Decision: reranking is skipped for now. Ollama 0.40.16 has no rerank endpoint (404 on
   `/api/rerank` and `/v1/rerank`); the local options and their trade-offs are in the wiki.
 - Next best step is unchanged: the eval set, which also tells whether reranking is worth it.
+
+### Session 004
+
+- Date: 2026-11-11
+- Goal: a knowledge graph for the RAG playground (`rag-004`).
+- Completed: `rag_playground/graph.py` (extraction agent, resumable build, JSON cache, lookup
+  by name); `campaign_relations` tool and `graph=` argument on `rag.agentic`; `--graph` CLI
+  flag (needs `--agentic`); `RAG_GRAPH_MODEL` setting; `doc_path` helper in `index.py`.
+  README, AGENTS.md, `.env.example`, wiki section "Knowledge graphs", checklist updated.
+- Verification run: `./init.sh` exit 0, pytest 118 passed (6 new).
+- Real run: graph built in 118 min with `qwen3.6:35b-a3b` (1,251 relations, 23 chunks
+  skipped); the model called `campaign_relations` on connection questions with both
+  `gemma4:e4b` and `qwen3.6:35b-a3b` (details in `rag-004` evidence).
+- Local-only state (git-ignored): `data/rag/setting-the-darkness-ablaze.graph.json`. A fresh
+  clone, a changed document or a changed `RAG_GRAPH_MODEL` means a two-hour rebuild.
+- Known risk or unresolved issue: aliases are not merged, some extracted relations are
+  wrong, skipped chunks are not retried, and nothing was fact-checked by a human.
+- Branch `rag-knowledge-graph`, stacked on `rag-hybrid-search`; committed locally, not pushed.
+- Next best step: the eval set, including two or three connection questions, to measure
+  whether hybrid search and the graph improve answers.

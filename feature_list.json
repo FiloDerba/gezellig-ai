@@ -104,16 +104,19 @@
       "area": "rag_playground",
       "title": "RAG playground: knowledge graph lookup tool for agentic mode",
       "user_visible_behavior": "`uv run rag-playground --agentic --graph` builds a knowledge graph of the campaign on first use (a local chat model reads every chunk once and writes down the relations between named things), saves it next to the index, and gives the model a campaign_relations tool to look a name up. An interrupted build continues where it stopped.",
-      "status": "in_progress",
+      "status": "passing",
       "verification": [
         "Run ./init.sh.",
         "Run `uv run rag-playground --agentic --graph` against the real document: check the build finishes, a second start skips it, and a question about connections makes the model call campaign_relations."
       ],
       "evidence": [
         "2026-11-11: ./init.sh exit 0, pytest 118 passed (6 new: extraction, cache reuse, resume after interruption, name lookup, tool wiring, result cap).",
-        "2026-11-11: model trial on 3 real chunks. gemma4:e4b failed on 2 of 3. qwen3.8:27b worked at 36-52 s a chunk. qwen3.6:35b-a3b with thinking off: about 3 s a chunk and cleaner relations, so it is the default (RAG_GRAPH_MODEL)."
+        "2026-11-11: model trial on 3 real chunks. gemma4:e4b failed on 2 of 3. qwen3.8:27b worked at 36-52 s a chunk. qwen3.6:35b-a3b with thinking off: about 3 s a chunk and cleaner relations, so it is the default (RAG_GRAPH_MODEL).",
+        "2026-11-11: real build with qwen3.6:35b-a3b: 657 chunks in 118.3 min, 1,251 relations, 619 distinct names, 23 chunks skipped (unusable model output). A second start skipped the build.",
+        "2026-11-11: real run, `--agentic --graph`, gemma4:e4b: 'How are Cevan and Vecna connected?' called campaign_relations twice (101 and 33 relations) and answered that they are the same entity, citing chapters 24, 25, 29, 32, 38. 'Who is connected to the city of Kallista?' called it once (20 relations). With qwen3.6:35b-a3b and --hybrid the model called campaign_relations and then search_campaign on both questions.",
+        "2026-11-11: comparison without --graph, gemma4:e4b, same two questions: both answered; the Kallista answer lacked the governor (High King Thalion Arannis), Ryn and the Sable Enclave, which the graph run included."
       ],
-      "notes": "Small version on purpose: triples in a JSON file, lookup by substring on the name, no graph database, no clusters or summaries. Known limits: two spellings of a name stay two entities; relations carry the section they came from but no other notion of time."
+      "notes": "Small version on purpose: triples in a JSON file, lookup by substring on the name, no graph database, no clusters or summaries. Known limits: two spellings of a name stay two entities; relations carry the section they came from but no other notion of time. Seen in the real graph: aliases split one character over several names (Cevan, Lord Cevan, Vecna, Vecna the Undying), and some relations are wrong (e.g. 'Tiamat | was slain by | the narrator' from a world-building section). Answers were not fact-checked by someone who knows the campaign. The 23 skipped chunks are not retried."
     }
   ]
 }
