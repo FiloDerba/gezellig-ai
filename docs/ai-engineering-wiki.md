@@ -291,6 +291,55 @@ are not.
   HyDE, writes a made-up answer and searches with that, because an answer looks more like
   the stored passages than a question does.
 
+They sit at different stages of one pipeline, so they combine:
+
+```
+question → (rewrite) → vector + keyword search → merge → ~50 chunks → (rerank) → best 5 → model
+```
+
+### How hybrid search works
+
+**Why vector search is not enough.** The embedding model has never seen an invented name,
+so it turns it into a vague vector. A chunk that contains the name can rank below chunks
+that are only about a similar topic.
+
+**Keyword search (BM25)** scores a chunk by the question's exact words. Three things set the
+score:
+
+- **Rare words count most.** A word found in 2 chunks out of 657 says far more than "the" or
+  "who", which are in almost all of them. This is why it is strong on invented names.
+- **More mentions help, but less each time.** Ten mentions do not score ten times one.
+- **Long chunks are scaled down**, so a chunk does not win only by containing more words.
+
+It needs no model: it is an index from each word to the chunks containing it, so it is fast
+to build and to search.
+
+**Merging.** The two scores cannot be added: cosine similarity is between -1 and 1, a BM25
+score has no upper limit. Reciprocal rank fusion ignores the scores and uses positions:
+
+| Chunk | Vector rank | Keyword rank | Score |
+|---|---|---|---|
+| A | 1 | not found | 1/61 = 0.0164 |
+| B | 2 | 3 | 1/62 + 1/63 = 0.0320 |
+| C | not found | 1 | 1/61 = 0.0164 |
+
+B wins because both searches agree on it. A and C still get through, each on the strength
+of one search. The 60 is a convention; it keeps the top position from dominating.
+
+**What each side is good at:**
+
+| | Vector search | Keyword search |
+|---|---|---|
+| Finds | The same meaning in different words | The exact word |
+| Good for | "What destroyed the continent?" | Names, codes, numbers, rare terms |
+| Misses | Rare and invented names | Synonyms, paraphrases, other spellings |
+
+**Limits.** Keyword search matches spelling, so a typo or a second spelling of a name
+("Rhosghonel" and "Rhosgonel" both occur in the campaign) is a miss for it. Hybrid search
+also cannot fix a question that has no useful words in it; that is what query rewriting is
+for. And the merge can push out a good vector result in favour of a chunk that only repeats
+a word from the question, so measure it on your own questions before making it the default.
+
 *In this repo:* `uv run rag-playground --hybrid`. LanceDB builds the keyword index on the
 `text` column and does the merge (`rag_playground/index.py`). Measured on 14 names that occur
 in only one or two of the 657 chunks ("Who or what is Vaxumbria?"): vector search had the
