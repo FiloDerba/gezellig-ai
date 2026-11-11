@@ -120,3 +120,25 @@ before handoff (see `AGENTS.md`).
 - Branch `rag-knowledge-graph`, stacked on `rag-hybrid-search`; committed locally, not pushed.
 - Next best step: the eval set, including two or three connection questions, to measure
   whether hybrid search and the graph improve answers.
+
+### Session 005
+
+- Date: 2026-11-11
+- Goal: fix the two graph problems found in Session 004: one character under several names,
+  and wrong relations (`rag-005`).
+- Completed (code): the extractor returns the sentence that states each relation; `stated`
+  drops a relation when that sentence or a name is not in the chunk, when an end has no
+  capital letter, or when it names the narrator in text with no first person. The cache key
+  includes the prompt. `draft_aliases` / `load_aliases` write `data/rag/<name>.aliases.json`
+  once (model draft, then hand-edited, never overwritten); `Graph.about` follows the groups
+  and `campaign_relations` shows the quote and the alias names.
+- Verification run: `./init.sh` exit 0, pytest 121 passed (3 new).
+- NOT DONE: the real rebuild, so `rag-005` is `in_progress`. It was started, stopped at 13 of
+  657 chunks, and put on hold at the user's request. Until it runs, `--graph` starts the
+  two-hour build on first use. The old graph is kept as `…graph-v1.json` (git-ignored).
+- Measured so far (details in `rag-005` evidence): in a sample of 49 old relations, 18 were
+  clearly stated relations between named things and 23 were junk or wrong.
+- Known risk: the checks do not judge meaning, so a relation with a real but unrelated quote
+  still passes. The alias draft makes mistakes ("Rayl" grouped with Cevan) and needs review.
+- Next best step: run the rebuild (`uv run rag-playground --agentic --graph`), review the
+  alias file, judge a sample of 50 new relations, then update the wiki with the numbers.

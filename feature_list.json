@@ -117,6 +117,28 @@
         "2026-11-11: comparison without --graph, gemma4:e4b, same two questions: both answered; the Kallista answer lacked the governor (High King Thalion Arannis), Ryn and the Sable Enclave, which the graph run included."
       ],
       "notes": "Small version on purpose: triples in a JSON file, lookup by substring on the name, no graph database, no clusters or summaries. Known limits: two spellings of a name stay two entities; relations carry the section they came from but no other notion of time. Seen in the real graph: aliases split one character over several names (Cevan, Lord Cevan, Vecna, Vecna the Undying), and some relations are wrong (e.g. 'Tiamat | was slain by | the narrator' from a world-building section). Answers were not fact-checked by someone who knows the campaign. The 23 skipped chunks are not retried."
+    },
+    {
+      "id": "rag-005",
+      "priority": 7,
+      "area": "rag_playground",
+      "title": "RAG playground: knowledge graph quality (quoted evidence, names only, aliases)",
+      "user_visible_behavior": "The graph build keeps a relation only when its chunk contains the sentence the model quotes for it and both names, and never a narrator in text without a first person. A model-drafted, hand-editable alias file (data/rag/<name>.aliases.json) makes campaign_relations return the relations of every name of the same character, and the tool shows the quoted sentence with each relation.",
+      "status": "in_progress",
+      "verification": [
+        "Run ./init.sh.",
+        "Rebuild the graph on the real document (about two hours) and record relations kept and dropped.",
+        "Judge a random sample of 50 relations against their source sentences and compare with the old graph's sample.",
+        "Review the drafted alias file, then ask a question under one alias (Cevan) and check relations of the other (Vecna) come back."
+      ],
+      "evidence": [
+        "2026-11-11: ./init.sh exit 0, pytest 121 passed (3 new: the support check, alias draft and file, lookup across aliases).",
+        "2026-11-11: old graph, before the change. 104 of 1,251 relations name an end that is in no chunk of their section; 319 of 1,251 have an end with no capital letter ('cloak', 'the tavern'). In a random sample of 49 judged by Claude against the source sentences: 18 clearly stated relations between named things, 8 borderline, 23 junk or wrong.",
+        "2026-11-11: trial of the new extraction on 10 real chunks (before the capital-letter rule): 31 relations kept, 6 dropped; the made-up 'Tiamat was slain by' relation was dropped. Relations whose quote does not mean what the relation says still pass ('Roger | lives in | Daerin's home').",
+        "2026-11-11: alias draft on the old graph's 619 names, qwen3.6:35b-a3b, thinking off: 24 groups in 138 s. Right: Lord Cevan = Vecna = Cevan; the narrator = Ryn; Queen Sehara = Sehara; spelling variants. Doubtful: 'Rayl' in the Cevan group, 'Rosghonelian' in the Chiara group, 'Lou' with the narrator.",
+        "2026-11-11: NOT DONE: the real rebuild. It was started, then stopped at 13 of 657 chunks and put on hold at the user's request."
+      ],
+      "notes": "Until the rebuild runs, --graph has no graph: the cache key now includes the prompt, so the old graph is not loaded and the next --graph start begins the two-hour build. The old graph is kept as data/rag/setting-the-darkness-ablaze.graph-v1.json (git-ignored). The checks are deterministic and do not judge meaning; a second model pass that checks each relation was not built."
     }
   ]
 }

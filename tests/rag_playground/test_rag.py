@@ -150,6 +150,7 @@ def test_stated_needs_the_quote_and_both_names_in_the_chunk():
     assert not graph.stated(changed(quote="Nerwen destroyed the Old Gods."), CHUNKS[0])
     assert not graph.stated(changed(quote=""), CHUNKS[0])
     assert not graph.stated(changed(target="Old Gods of Chaos"), CHUNKS[0])
+    assert not graph.stated(changed(target="old gods"), CHUNKS[0])  # no capital: not a name
     assert not graph.stated(changed(source="the narrator"), CHUNKS[0])  # no "I" in this text
     assert graph.stated(changed(source="the narrator"), CHUNKS[0] + " I saw it.")
 
@@ -162,6 +163,7 @@ def test_load_graph_extracts_once_then_reuses_the_cache(tmp_path, monkeypatch, c
     # Chapter 1 does not contain the quote, so its relation is left out.
     assert "Extracted 2 relations from 3 chunks (0 chunks skipped, 1 rel" in capsys.readouterr().out
     assert first.relations[0] == {**NERWEN.model_dump(), "section": "History"}
+    assert (tmp_path / "c.aliases.json").exists()  # the names were grouped once, too
     second = load_graph(CHUNKS, tmp_path / "c.docx", agent)
     assert capsys.readouterr().out == ""
     assert second.relations == first.relations and len(calls) == 3
@@ -212,6 +214,30 @@ def test_graph_finds_a_name_at_either_end_once():
         {"source": "Nerwen", "relation": "nurtured", "target": "Ancora", "section": "D"},
     ]
     assert [row["section"] for row in Graph(rows).about(" KALLISTA ")] == ["A", "C"]
+
+
+def test_aliases_are_drafted_once_and_an_edited_file_is_kept(tmp_path, capsys):
+    rows = [{**NERWEN.model_dump(), "source": "Cevan", "target": "Vecna", "section": "A"}]
+    model = TestModel(custom_output_args={"groups": [["Vecna", "Cevan", "Nobody"], ["Cevan"]]})
+    path = tmp_path / "c.aliases.json"
+    # "Nobody" is not a name in the graph, and a group of one says nothing.
+    assert graph.load_aliases(path, rows, model) == [["Vecna", "Cevan"]]
+    assert "Review that file" in capsys.readouterr().out
+    path.write_text('[["Cevan", "Vecna", "Rayl"]]')
+    assert graph.load_aliases(path, rows, model) == [["Cevan", "Vecna", "Rayl"]]
+
+
+def test_graph_follows_aliases_and_the_tool_names_them():
+    rows = [
+        {**NERWEN.model_dump(), "source": "Lord Cevan", "section": "A"},
+        {**NERWEN.model_dump(), "source": "Vecna the Undying", "section": "B"},
+        {**NERWEN.model_dump(), "section": "C"},
+    ]
+    assert [row["section"] for row in Graph(rows).about("cevan")] == ["A"]
+    merged = Graph(rows, [["Vecna", "Cevan"]])
+    assert [row["section"] for row in merged.about("cevan")] == ["A", "B"]
+    assert rag.relations_tool(merged)("Cevan").startswith("These names are the same: Vecna, Cevan.")
+    assert "These names" not in rag.relations_tool(merged)("Nerwen")
 
 
 def test_agentic_agent_with_a_graph_can_look_up_relations(capsys):

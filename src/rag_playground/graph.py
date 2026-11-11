@@ -39,6 +39,24 @@ events) that the excerpt states. Rules:
   Leave the relation out if no sentence states it.
 """
 
+ALIAS_PROMPT = """
+You are given every name in a knowledge graph of a Dungeons & Dragons campaign, one per line,
+then a few relations from that graph that may say two names are the same.
+
+Group the names that mean the same character, place, faction or item: a name with and
+without a title ("Sehara", "Queen Sehara"), a short and a full name, two spellings, a true
+name and a disguise. Rules:
+- Copy names exactly as given. A name goes in one group at most.
+- Put the most complete name first.
+- Only group names you are sure about. Relatives, a ruler and their realm, a group and its
+  members are different things. Leave out every name that stands alone.
+"""
+
+# Thinking off: about 11 s a chunk over the whole campaign, against 40 s and more with it on
+# in a trial, and with cleaner output.
+# shortcut: assumes an Ollama model that accepts this setting; drop it for other providers.
+SETTINGS = ModelSettings(extra_body={"reasoning_effort": "none"})
+SAME = re.compile(r"\b(known as|named|name of|called|alias|same as)\b|^is$", re.IGNORECASE)
 FIRST_PERSON = re.compile(r"\b(I|me|my|we|us|our)\b")
 QUOTES = str.maketrans("‘’“”", "''\"\"")
 
@@ -50,6 +68,10 @@ class Relation(BaseModel):
     quote: str = Field(description="Sentence of the excerpt that states it, word for word")
 
 
+class Aliases(BaseModel):
+    groups: list[list[str]] = Field(description="Each group: the names of one same thing")
+
+
 Extractor = Agent[None, list[Relation]]
 
 
@@ -58,11 +80,7 @@ def extractor(model: Model | str | None = None) -> Extractor:
     if not isinstance(model, Model):
         name = model or os.getenv("RAG_GRAPH_MODEL") or DEFAULT_MODEL
         model = OpenAIChatModel(name, provider=ollama())
-    # Thinking off: about 11 s a chunk over the whole campaign, against 40 s and more with it
-    # on in a trial, and with cleaner output.
-    # shortcut: assumes an Ollama model that accepts this setting; drop it for other providers.
-    settings = ModelSettings(extra_body={"reasoning_effort": "none"})
-    return Agent(model, system_prompt=PROMPT, output_type=list[Relation], model_settings=settings)
+    return Agent(model, system_prompt=PROMPT, output_type=list[Relation], model_settings=SETTINGS)
 
 
 def extract(agent: Extractor, chunk: str) -> list[Relation]:
@@ -75,34 +93,82 @@ def _plain(text: str) -> str:
 
 
 def stated(relation: Relation, chunk: str) -> bool:
-    """Whether `chunk` backs the relation: it contains the quote and both names.
+    """Whether `chunk` backs the relation: it contains the quote, and both ends are names in it.
 
-    This drops relations the model made up, ends that are not names ("unknown", "a burial
-    site") and a narrator in text that has none. It does not check that the quote means
-    what the relation says.
+    This drops relations the model made up, ends that are not names ("unknown", "a cloak")
+    and a narrator in text that has none. It does not check that the quote means what the
+    relation says.
     """
     text = _plain(chunk)
-    names = {_plain(relation.source), _plain(relation.target)}
-    if FIRST_PERSON.search(chunk):
-        names.discard("the narrator")  # the one name that is not written in the text
+    names = [relation.source, relation.target]
+    if FIRST_PERSON.search(chunk):  # the narrator is the one name not written in the text
+        names = [name for name in names if _plain(name) not in ("the narrator", "narrator")]
+    # shortcut: "has a capital letter" stands for "is a name", so "the hag" is lost too.
+    named = names and all(name != name.lower() and _plain(name) in text for name in names)
     # The model shortens long sentences with "...": every piece it kept must be in the text.
     pieces = [piece.strip() for piece in re.split(r"\.\.\.|…", _plain(relation.quote))]
-    return any(pieces) and all(piece in text for piece in pieces + sorted(names))
+    return bool(named) and any(pieces) and all(piece in text for piece in pieces)
+
+
+def draft_aliases(relations: list[dict[str, str]], model: Model | str | None) -> list[list[str]]:
+    """Ask a chat model which names in the graph mean the same thing. A draft, to be reviewed."""
+    names = sorted({row[end] for row in relations for end in ("source", "target")})
+    hints = [
+        f"{row['source']} | {row['relation']} | {row['target']}"
+        for row in relations
+        if SAME.search(row["relation"])
+    ]
+    agent = Agent(model, system_prompt=ALIAS_PROMPT, output_type=Aliases, model_settings=SETTINGS)
+    question = "Names:\n" + "\n".join(names) + "\n\nRelations:\n" + "\n".join(hints)
+    groups = [
+        [name for name in dict.fromkeys(group) if name in names]
+        for group in agent.run_sync(question).output.groups
+    ]
+    return [group for group in groups if len(group) > 1]  # the model's own inventions are gone
+
+
+def load_aliases(
+    path: Path, relations: list[dict[str, str]], model: Model | str | None
+) -> list[list[str]]:
+    """Groups of names that mean the same thing: drafted by the model once, then yours to edit."""
+    if not path.exists():
+        if not relations:
+            return []
+        print("Grouping names that mean the same thing...", end="", flush=True)
+        try:
+            groups = draft_aliases(relations, model)
+        except UnexpectedModelBehavior:
+            print("\rCould not group the names; names are looked up as written.")
+            return []
+        path.write_text(json.dumps(groups, indent=1, ensure_ascii=False))
+        print(f"\rDrafted {len(groups)} groups of names in {path}.")
+        print("Review that file: a wrong group mixes two characters.")
+    return json.loads(path.read_text())
 
 
 class Graph:
-    def __init__(self, relations: list[dict[str, str]]):
-        """`relations` are dicts: source, relation, target, the quote that states it, section."""
-        self.relations = relations
+    def __init__(self, relations: list[dict[str, str]], aliases: list[list[str]] | None = None):
+        """`relations` are dicts: source, relation, target, the quote that states it, section.
+
+        `aliases` are groups of names that mean the same thing.
+        """
+        self.relations, self.aliases = relations, aliases or []
+
+    def names(self, name: str) -> list[str]:
+        """`name`, with every other name its alias group gives for the same thing."""
+        wanted = _plain(name)
+        same = [alias for group in self.aliases if wanted in map(_plain, group) for alias in group]
+        return same or [name]
 
     def about(self, name: str) -> list[dict[str, str]]:
-        """Relations with `name` at either end, each distinct one once, in story order."""
-        # shortcut: plain substring match, so two spellings of a name stay two entities;
-        # merge aliases at extraction time if that starts to hide answers.
-        wanted = name.casefold().strip()
+        """Relations with `name` or one of its aliases at either end, once each, in story order."""
+        # shortcut: substring match, so "Kaia" also returns "Kaia's mother"; match whole
+        # names if that noise starts to hide answers.
+        wanted = [_plain(alias) for alias in self.names(name)]
         found = {}
         for row in self.relations:
-            if wanted in row["source"].casefold() or wanted in row["target"].casefold():
+            ends = _plain(row["source"]), _plain(row["target"])
+            if any(alias in end for alias in wanted for end in ends):
                 key = (
                     row["source"].casefold(),
                     row["relation"].casefold(),
@@ -125,11 +191,12 @@ def load_graph(
     name = getattr(agent.model, "model_name", agent.model)
     key = f"{name}:{hashlib.sha256(chr(0).join([PROMPT, *chunks]).encode()).hexdigest()}"
     cache = doc_path(doc).with_suffix(".graph.json")
+    aliases = doc_path(doc).with_suffix(".aliases.json")
     saved = json.loads(cache.read_text()) if cache.exists() else {}
     if saved.get("key") != key:
         saved = {"key": key, "done": 0, "relations": []}
     if saved["done"] == len(chunks):
-        return Graph(saved["relations"])
+        return Graph(saved["relations"], load_aliases(aliases, saved["relations"], agent.model))
 
     skipped = dropped = 0
     for number, chunk in enumerate(chunks[saved["done"] :], start=saved["done"]):
@@ -148,4 +215,4 @@ def load_graph(
         partial.replace(cache)  # never leaves a half-written file behind
     note = f" ({skipped} chunks skipped, {dropped} relations dropped as not in the text)"
     print(f"\rExtracted {len(saved['relations'])} relations from {len(chunks)} chunks{note}.    ")
-    return Graph(saved["relations"])
+    return Graph(saved["relations"], load_aliases(aliases, saved["relations"], agent.model))

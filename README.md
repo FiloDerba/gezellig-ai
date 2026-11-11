@@ -52,8 +52,11 @@ search and merges it with the vector results, which finds rare invented names th
 embedding model misses; it needs the LanceDB store. `--graph` (with `--agentic`) has a
 local chat model (`RAG_GRAPH_MODEL`) read every chunk once and write down the relations
 between named things into `data/rag/<name>.graph.json`, about two hours for this campaign;
-an interrupted build continues where it stopped. The model then gets a `campaign_relations`
-tool to look a name up. Both modes print which chapters were retrieved, so you
+an interrupted build continues where it stopped. A relation is kept only when its chunk
+contains the sentence the model quotes for it and both names. The model also drafts
+`data/rag/<name>.aliases.json`, groups of names that mean the same thing ("Cevan",
+"Vecna"); review and edit that file, it is never overwritten. The chat model then gets a
+`campaign_relations` tool to look a name up under all its aliases. Both modes print which chapters were retrieved, so you
 can see why an answer came out the way it did. Two-step answers each question on its own;
 agentic keeps the conversation. `loader.py` knows this document's heading style names
 (`SamKop`, `Samkop2`); change them there for another document.

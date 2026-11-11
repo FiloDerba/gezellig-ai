@@ -91,6 +91,8 @@ def relations_tool(graph: Graph) -> Callable[[str], str]:
         ]
         if len(found) > MAX_RELATIONS:
             lines.append(f"... and {len(found) - MAX_RELATIONS} more")
+        if len(same := graph.names(name)) > 1:
+            lines.insert(0, f"These names are the same: {', '.join(same)}.")
         return "\n".join(lines)
 
     return campaign_relations
