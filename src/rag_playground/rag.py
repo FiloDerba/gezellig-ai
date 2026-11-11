@@ -9,6 +9,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 
 from ai_playground.agent import DEFAULT_MODEL
 from ai_playground.agent import Agent as PlaygroundAgent
+from rag_playground.graph import Graph
 from rag_playground.index import Index, ollama
 
 RULES = """
@@ -27,6 +28,14 @@ use web search for campaign questions.
 """
     + RULES
 )
+
+GRAPH_CONTEXT = """
+You also have campaign_relations, a lookup of how named characters, places and factions are
+related across the whole story. Use it for questions about connections or overviews, then
+use search_campaign to read the passages before you answer.
+"""
+
+MAX_RELATIONS = 60  # an entity like the narrator has hundreds; keep the tool result readable
 
 
 def model_name() -> str:
@@ -63,8 +72,35 @@ def search_tool(index: Index) -> Callable[[str], str]:
     return search_campaign
 
 
-def agentic(index: Index, model: Model | str | None = None) -> PlaygroundAgent:
-    """Agentic RAG: the playground agent, with retrieval as a tool it chooses to call."""
-    return PlaygroundAgent(
-        model or model_name(), extra_context=AGENTIC_CONTEXT, extra_tools=[search_tool(index)]
-    )
+def relations_tool(graph: Graph) -> Callable[[str], str]:
+    def campaign_relations(name: str) -> str:
+        """Look up how one named character, place, faction or item is related to others.
+
+        Returns one line per relation, "A | relation | B (chapter it comes from)", gathered
+        from the whole campaign. Pass a single name, as it is written in the story.
+        """
+        found = graph.about(name)
+        print(f"  [campaign_relations({name!r}) -> {len(found)} relations]")
+        if not found:
+            return f"Nothing in the graph about {name!r}. Try search_campaign."
+        lines = [
+            f"{row['source']} | {row['relation']} | {row['target']} ({row['section']})"
+            for row in found[:MAX_RELATIONS]
+        ]
+        if len(found) > MAX_RELATIONS:
+            lines.append(f"... and {len(found) - MAX_RELATIONS} more")
+        return "\n".join(lines)
+
+    return campaign_relations
+
+
+def agentic(
+    index: Index, model: Model | str | None = None, graph: Graph | None = None
+) -> PlaygroundAgent:
+    """Agentic RAG: the playground agent, with retrieval as a tool it chooses to call.
+
+    With `graph`, it also gets a tool to look up relations between named things.
+    """
+    tools = [search_tool(index)] + ([relations_tool(graph)] if graph else [])
+    context = AGENTIC_CONTEXT + (GRAPH_CONTEXT if graph else "")
+    return PlaygroundAgent(model or model_name(), extra_context=context, extra_tools=tools)

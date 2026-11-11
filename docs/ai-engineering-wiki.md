@@ -16,6 +16,7 @@ Last updated: 2026-11-10.
 - [Two-step against agentic RAG](#two-step-against-agentic-rag)
 - [Vector databases](#vector-databases)
 - [Hybrid search and reranking](#hybrid-search-and-reranking)
+- [Knowledge graphs](#knowledge-graphs)
 - [RAG vs fine-tuning](#rag-vs-fine-tuning)
 - [Choosing a model: speed against quality](#choosing-a-model-speed-against-quality)
 - [Testing and shipping habits](#testing-and-shipping-habits)
@@ -396,6 +397,47 @@ The ways to run one locally anyway:
 
 If it is built later, start with the LanceDB option. None of the three has been run here.
 
+## Knowledge graphs
+
+A knowledge graph stores **entities** (people, places, factions, events) and the
+**relations** between them, as triples: `Kallista | is the capital of | Carverun`. Using one
+for retrieval is called **GraphRAG**.
+
+**Why chunks are not enough.** A search returns the 5 passages closest to the question. That
+works when one passage holds the answer. It fails when the answer is spread thinly over the
+whole text ("who is connected to Kallista?") or needs several steps ("who leads the faction
+that the narrator's friend belongs to?").
+
+**How it is built.** A chat model reads every chunk once and writes down the relations it
+states. This happens at indexing time, so it is slow to build and needs no model to look up.
+
+| | Vector or keyword search | Knowledge graph |
+|---|---|---|
+| Stores | Passages of text | Facts pulled out of the text |
+| Built by | An embedding model, in about a minute here | A chat model, one call per chunk |
+| Answers well | "What happened at X?" | "How are X and Y related?", "what is connected to X?" |
+| Keeps | The author's exact words | Only what the model wrote down |
+| Fails when | The answer is spread over many passages | The model missed or misread a relation |
+
+**What makes it hard.**
+
+- **Extraction is noisy.** The model decides what counts as a relation. Without firm rules
+  it records every sword blow as one. A weak model produces nothing usable.
+- **Names must be matched.** "Rhosghonel" and "Rhosgonel" become two entities unless
+  someone merges them. So do "Nerwen" and "the goddess of love".
+- **Stories change.** An ally in chapter 6 is an enemy in chapter 30. A triple has no time
+  in it unless you store where it came from.
+- **The narrator.** In a first-person text most relations start at "I", which has to be
+  given a name.
+
+**Full GraphRAG goes further:** it groups related entities into clusters and writes a
+summary of each one, to answer questions about the whole text ("what are the main themes?").
+That is much more model work at indexing time.
+
+**Rule of thumb:** add a graph when you have questions about connections that the search
+demonstrably fails on. Keep the search: the graph says *that* two things are related and
+where, the passages say *what happened*.
+
 ## RAG vs fine-tuning
 
 **RAG gives the model facts to read at question time. Fine-tuning changes how the model
@@ -477,6 +519,8 @@ Useful commands: `ollama list` (installed), `ollama ps` (loaded right now),
 | Top-k | The k closest chunks returned by a search. |
 | BM25 | The standard keyword-search scoring method. |
 | Reranker | A second model that re-scores retrieved chunks against the question. |
+| Knowledge graph | Entities and the relations between them, stored as triples. |
+| Indexing time | The preparation done once per document, before any question. |
 | Agent | A model in a loop that decides which tools to call and when to stop. |
 | Hallucination | A confident answer that is not supported by the source or by fact. |
 | Eval | A fixed set of questions with expected answers, used to measure quality. |

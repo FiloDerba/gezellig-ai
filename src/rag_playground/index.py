@@ -33,6 +33,10 @@ def default_embedder() -> Embedder:
     return Embedder(OpenAIEmbeddingModel(name, provider=ollama()))
 
 
+def doc_path(doc: str | Path | None = None) -> Path:
+    return Path(doc or os.getenv("RAG_DOC") or DEFAULT_DOC)
+
+
 def _unit(vectors) -> np.ndarray:
     array = np.asarray(vectors, dtype=np.float32)
     return array / np.linalg.norm(array, axis=-1, keepdims=True)
@@ -102,7 +106,7 @@ def load_index(
     store = store or os.getenv("RAG_STORE") or STORES[0]
     if store not in STORES:
         raise ValueError(f"RAG_STORE must be one of {STORES}, not {store!r}")
-    doc = Path(doc or os.getenv("RAG_DOC") or DEFAULT_DOC)
+    doc = doc_path(doc)
     embedder = embedder or default_embedder()
     stat = doc.stat()
     name = getattr(embedder.model, "model_name", embedder.model)  # model may be a plain string

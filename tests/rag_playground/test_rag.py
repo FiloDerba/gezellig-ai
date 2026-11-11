@@ -2,11 +2,12 @@ import zipfile
 
 import numpy as np
 import pytest
-from pydantic_ai import Embedder
+from pydantic_ai import Embedder, UnexpectedModelBehavior
 from pydantic_ai.embeddings import TestEmbeddingModel
 from pydantic_ai.models.test import TestModel
 
-from rag_playground import loader, rag
+from rag_playground import graph, loader, rag
+from rag_playground.graph import Graph, Relation, load_graph
 from rag_playground.index import Index, lance_table, load_index, top_k
 
 NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -122,3 +123,91 @@ def test_agentic_agent_calls_search_campaign(capsys):
     output, _ = agent.run("Where was the temple?")
     assert output
     assert "search_campaign(" in capsys.readouterr().out
+
+
+NERWEN = Relation(source="Nerwen", relation="banished", target="Old Gods of Chaos")
+CHUNKS = ["History\nNerwen banished the Old Gods.", "Chapter 1\nWe walked.", "Chapter 2\nAgain."]
+
+
+def test_extractor_returns_relations():
+    model = TestModel(custom_output_args=[NERWEN.model_dump()])
+    assert graph.extract(graph.extractor(model), CHUNKS[0]) == [NERWEN]
+
+
+def test_load_graph_extracts_once_then_reuses_the_cache(tmp_path, monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(graph, "extract", lambda agent, chunk: calls.append(chunk) or [NERWEN])
+    agent = graph.extractor(TestModel())
+    first = load_graph(CHUNKS, tmp_path / "c.docx", agent)
+    assert "Extracted 3 relations from 3 chunks." in capsys.readouterr().out
+    assert first.relations[0] == {**NERWEN.model_dump(), "section": "History"}
+    second = load_graph(CHUNKS, tmp_path / "c.docx", agent)
+    assert capsys.readouterr().out == ""
+    assert second.relations == first.relations and len(calls) == 3
+    load_graph([*CHUNKS, "Chapter 3\nNew."], tmp_path / "c.docx", agent)  # the text changed
+    assert len(calls) == 7
+
+
+def test_load_graph_continues_after_an_interruption_and_skips_unusable_output(
+    tmp_path, monkeypatch, capsys
+):
+    def stops_at_the_second_chunk(agent, chunk):
+        if chunk == CHUNKS[1]:
+            raise KeyboardInterrupt
+        return [NERWEN]
+
+    def second_chunk_is_unusable(agent, chunk):
+        seen.append(chunk)
+        if chunk == CHUNKS[1]:
+            raise UnexpectedModelBehavior("not json")
+        return [NERWEN]
+
+    agent, seen = graph.extractor(TestModel()), []
+    monkeypatch.setattr(graph, "extract", stops_at_the_second_chunk)
+    with pytest.raises(KeyboardInterrupt):
+        load_graph(CHUNKS, tmp_path / "c.docx", agent)
+    monkeypatch.setattr(graph, "extract", second_chunk_is_unusable)
+    resumed = load_graph(CHUNKS, tmp_path / "c.docx", agent)
+    assert seen == CHUNKS[1:]  # the first chunk was not read again
+    assert [row["section"] for row in resumed.relations] == ["History", "Chapter 2"]
+    assert "(1 chunks skipped)" in capsys.readouterr().out
+
+
+def test_graph_finds_a_name_at_either_end_once():
+    rows = [
+        {
+            "source": "Kallista",
+            "relation": "is the capital of",
+            "target": "Carverun",
+            "section": "A",
+        },
+        {
+            "source": "kallista",
+            "relation": "is the capital of",
+            "target": "Carverun",
+            "section": "B",
+        },
+        {"source": "The Sable Enclave", "relation": "is in", "target": "Kallista", "section": "C"},
+        {"source": "Nerwen", "relation": "nurtured", "target": "Ancora", "section": "D"},
+    ]
+    assert [row["section"] for row in Graph(rows).about(" KALLISTA ")] == ["A", "C"]
+
+
+def test_agentic_agent_with_a_graph_can_look_up_relations(capsys):
+    rows = [{**NERWEN.model_dump(), "section": "History"}]
+    model = TestModel(call_tools=["campaign_relations"])
+    output, _ = rag.agentic(fake_index(), model, Graph(rows)).run("Who is Nerwen?")
+    assert output
+    assert "campaign_relations('a') -> 1 relations" in capsys.readouterr().out
+
+
+def test_relations_tool_caps_long_results_and_says_when_nothing_is_found():
+    rows = [
+        {"source": "Nerwen", "relation": f"knows {n}", "target": "Cirdan", "section": "History"}
+        for n in range(rag.MAX_RELATIONS + 2)
+    ]
+    lookup = rag.relations_tool(Graph(rows))
+    lines = lookup("Nerwen").splitlines()
+    assert lines[0] == "Nerwen | knows 0 | Cirdan (History)"
+    assert len(lines) == rag.MAX_RELATIONS + 1 and lines[-1] == "... and 2 more"
+    assert "Nothing in the graph" in lookup("Vecna")

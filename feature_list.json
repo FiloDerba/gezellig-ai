@@ -97,6 +97,23 @@
         "2026-11-11: `uv run rag-playground --hybrid` answered 'Who is Imogene?' from Chapter 8; `RAG_STORE=numpy ... --hybrid` exits with a clear ValueError."
       ],
       "notes": "LanceDB native FTS index on the `text` column with default settings, merged by LanceDB's default reciprocal rank fusion. Opt-in, because there is no eval set yet to show it is better overall: the measurement only checks that the name appears in a retrieved chunk, not that the answer is right. Not built: reranking, query rewriting, the eval set."
+    },
+    {
+      "id": "rag-004",
+      "priority": 6,
+      "area": "rag_playground",
+      "title": "RAG playground: knowledge graph lookup tool for agentic mode",
+      "user_visible_behavior": "`uv run rag-playground --agentic --graph` builds a knowledge graph of the campaign on first use (a local chat model reads every chunk once and writes down the relations between named things), saves it next to the index, and gives the model a campaign_relations tool to look a name up. An interrupted build continues where it stopped.",
+      "status": "in_progress",
+      "verification": [
+        "Run ./init.sh.",
+        "Run `uv run rag-playground --agentic --graph` against the real document: check the build finishes, a second start skips it, and a question about connections makes the model call campaign_relations."
+      ],
+      "evidence": [
+        "2026-11-11: ./init.sh exit 0, pytest 118 passed (6 new: extraction, cache reuse, resume after interruption, name lookup, tool wiring, result cap).",
+        "2026-11-11: model trial on 3 real chunks. gemma4:e4b failed on 2 of 3. qwen3.8:27b worked at 36-52 s a chunk. qwen3.6:35b-a3b with thinking off: about 3 s a chunk and cleaner relations, so it is the default (RAG_GRAPH_MODEL)."
+      ],
+      "notes": "Small version on purpose: triples in a JSON file, lookup by substring on the name, no graph database, no clusters or summaries. Known limits: two spellings of a name stay two entities; relations carry the section they came from but no other notion of time."
     }
   ]
 }

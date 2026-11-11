@@ -38,6 +38,7 @@ ollama pull bge-m3
 uv run rag-playground             # two-step: always retrieve 5 chunks, then answer
 uv run rag-playground --agentic   # the model calls search_campaign when and as often as it wants
 uv run rag-playground --hybrid    # search by keyword as well as by vector (works with --agentic)
+uv run rag-playground --agentic --graph   # also give the model a knowledge graph lookup
 ```
 
 The document is split on its heading styles and packed into ~300-word chunks that start with

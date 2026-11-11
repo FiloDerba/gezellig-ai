@@ -6,15 +6,22 @@ from dotenv import load_dotenv
 def main() -> None:
     load_dotenv()
     from rag_playground import rag
+    from rag_playground.graph import load_graph
     from rag_playground.index import load_index
 
     parser = argparse.ArgumentParser(description="Ask questions about the D&D campaign.")
     parser.add_argument("--agentic", action="store_true", help="let the model decide to search")
     parser.add_argument("--hybrid", action="store_true", help="search by keyword as well as vector")
+    parser.add_argument(
+        "--graph", action="store_true", help="with --agentic: add a knowledge graph lookup tool"
+    )
     args = parser.parse_args()
+    if args.graph and not args.agentic:
+        parser.error("--graph needs --agentic: the graph is a tool the model chooses to call")
 
     index = load_index(hybrid=args.hybrid)
-    agent = rag.agentic(index) if args.agentic else None
+    graph = load_graph(index.chunks) if args.graph else None
+    agent = rag.agentic(index, graph=graph) if args.agentic else None
 
     mode = "Agentic" if args.agentic else "Two-step"
     search = "hybrid" if args.hybrid else "vector"
