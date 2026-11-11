@@ -347,6 +347,55 @@ name somewhere in its top 5 for 11 of 14 questions, hybrid for 14 of 14, at the 
 Names that occur often ("Ksenrae", in 44 chunks) were already found by vector search alone,
 so the gain is on the rare ones.
 
+### How reranking works
+
+**The problem.** The first search is fast but rough. The right chunk is often somewhere in
+the top 50, just not in the top 5 that the model gets to read.
+
+**The fix.** Retrieve about 50 chunks, have a second model (a **cross-encoder**) score each
+one against the question, and keep the best 5.
+
+**Why the second model judges better.** The embedding model is a **bi-encoder**: it reads
+the question and the chunk separately. The cross-encoder reads them together.
+
+| | Bi-encoder (embedding model) | Cross-encoder (reranker) |
+|---|---|---|
+| Reads | Question and chunk separately | Question and chunk together |
+| Output | One vector per text | One relevance score per pair |
+| When the work is done | Chunks once, in advance | Every pair, at question time |
+| Speed | Fast: compare vectors | Slow: one model run per chunk |
+| Judgement | Rough: the chunk was summed up before any question existed | Sharper: can tell a chunk names the right person but answers another question |
+
+**Limits.**
+
+- It improves the order, not the reach: a chunk that is not in the 50 cannot be brought back.
+- It runs once per chunk for every question and nothing can be prepared in advance, so it
+  is only affordable on a shortlist, never on the whole collection.
+
+**How to tell if you need it.** With an eval set, check where the right chunk lands. If it
+is often in the top 50 but not in the top 5, rerank. If it is already in the top 5, skip it.
+
+*In this repo:* not built. The reasons:
+
+- **No evidence of a ranking problem yet.** Simple lookups already retrieve the right
+  chapter, and hybrid search fixed the one failure that was measured. The eval set comes
+  first.
+- **It would not help the multi-chapter questions.** Those need several searches, which is
+  what agentic mode does.
+- **Ollama cannot serve a reranker.** Version 0.40.16 answers 404 on `/api/rerank` and
+  `/v1/rerank` (checked 2026-11-11), and the upstream feature request has been open since
+  March 2024.
+
+The ways to run one locally anyway:
+
+| Option | Needs | Trade-off |
+|---|---|---|
+| LanceDB's built-in `CrossEncoderReranker` | `sentence-transformers` and `torch` | Fewest lines: it plugs into the hybrid query in `rag_playground/index.py`. A large dependency. |
+| A chat model as the judge | Nothing new | One model call per chunk, so 50 calls per question. Slow. |
+| A separate rerank server | llama.cpp's `llama-server`, which has `/v1/rerank` | A real reranker model, but a second service to run. |
+
+If it is built later, start with the LanceDB option. None of the three has been run here.
+
 ## RAG vs fine-tuning
 
 **RAG gives the model facts to read at question time. Fine-tuning changes how the model

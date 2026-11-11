@@ -93,3 +93,10 @@ before handoff (see `AGENTS.md`).
 - Branch `rag-hybrid-search`, committed locally, not pushed.
 - Next best step: the eval set of ~10 questions with known answers, then decide whether
   hybrid becomes the default; after that, reranking.
+
+### Session 003 (continued): reranking notes
+
+- Docs only. `docs/ai-engineering-wiki.md` now explains how hybrid search and reranking work.
+- Decision: reranking is skipped for now. Ollama 0.40.16 has no rerank endpoint (404 on
+  `/api/rerank` and `/v1/rerank`); the local options and their trade-offs are in the wiki.
+- Next best step is unchanged: the eval set, which also tells whether reranking is worth it.
