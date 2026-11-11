@@ -276,17 +276,27 @@ keyword search for the hybrid experiment.
 
 ## Hybrid search and reranking
 
-Not built here yet. These are the standard fixes for weak retrieval.
+These are the standard fixes for weak retrieval. Hybrid search is built here; the other two
+are not.
 
 - **Hybrid search** runs a keyword search (BM25) next to the vector search and merges the
   two result lists. Keywords catch exact names and codes that embeddings blur. Expect this
-  to matter for invented names like "Ksenrae".
+  to matter for invented names. The usual merge is **reciprocal rank fusion**: each chunk
+  scores `1 / (60 + rank)` in each list and the sums are sorted, so only positions count,
+  not the two kinds of score.
 - **Reranking** retrieves generously (say 50 chunks) and then has a second, slower model
   (a cross-encoder) score each chunk against the question, keeping the best 5. It reads the
   question and chunk together, so it judges relevance better than vector distance alone.
 - **Query rewriting** has the model rephrase the question before searching. One variant,
   HyDE, writes a made-up answer and searches with that, because an answer looks more like
   the stored passages than a question does.
+
+*In this repo:* `uv run rag-playground --hybrid`. LanceDB builds the keyword index on the
+`text` column and does the merge (`rag_playground/index.py`). Measured on 14 names that occur
+in only one or two of the 657 chunks ("Who or what is Vaxumbria?"): vector search had the
+name somewhere in its top 5 for 11 of 14 questions, hybrid for 14 of 14, at the same speed.
+Names that occur often ("Ksenrae", in 44 chunks) were already found by vector search alone,
+so the gain is on the rare ones.
 
 ## RAG vs fine-tuning
 

@@ -8,7 +8,7 @@ before handoff (see `AGENTS.md`).
 - Repository root: `gezellig-ai/`
 - Standard startup path: `uv run streamlit run streamlit_app.py` (or `RUN_START_COMMAND=1 ./init.sh`)
 - Standard verification path: `./init.sh` (uv sync, ruff check, ruff format --check, pyright, pytest)
-- Current highest-priority unfinished feature: none recorded; next idea is a RAG eval set + hybrid search (see session 002)
+- Current highest-priority unfinished feature: none recorded; next idea is a RAG eval set, then reranking (see session 003)
 - Current blocker: none (`./init.sh` passes)
 
 ## Session Log
@@ -77,3 +77,19 @@ before handoff (see `AGENTS.md`).
 - Both this work and the `docs/` notes are on branch `add-lancedb`, in one pull request.
 - Next best step: an eval set of ~10 campaign questions, then hybrid search using LanceDB's
   built-in keyword index.
+
+### Session 003
+
+- Date: 2026-11-11
+- Goal: hybrid (keyword + vector) search in the RAG playground (`rag-003`).
+- Completed: `lance_table` builds a LanceDB keyword index on `text`; `Index(hybrid=True)` runs
+  LanceDB's hybrid query (merged by reciprocal rank fusion); `--hybrid` CLI flag, off by
+  default; startup line names the search type. README, AGENTS.md map row and the wiki updated.
+- Verification run: `./init.sh` exit 0, pytest 112 passed (2 new).
+- Real run: on 14 rare-name questions the name was in the top 5 for 11/14 with vector search
+  and 14/14 with hybrid; common questions unchanged (details in `rag-003` evidence).
+- Known risk or unresolved issue: the eval set was skipped, so "better" is only measured as
+  "the name appears in a retrieved chunk". Hybrid is opt-in until an eval set says otherwise.
+- Branch `rag-hybrid-search`, committed locally, not pushed.
+- Next best step: the eval set of ~10 questions with known answers, then decide whether
+  hybrid becomes the default; after that, reranking.

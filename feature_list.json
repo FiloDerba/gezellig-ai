@@ -1,6 +1,6 @@
 {
   "project": "gezellig-ai",
-  "last_updated": "2026-11-10",
+  "last_updated": "2026-11-11",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -79,6 +79,24 @@
         "2026-11-10: real index, 657 rows. Same top-5 chunks from both stores on 8 of 8 real questions, and on 200 of 200 chunk vectors used as queries. Table build 15 ms, search 8 ms."
       ],
       "notes": "lancedb 0.41.0 on Python 3.14. No ANN index is created, so the search is exact. Not built: metadata filter by chapter (the table has a `section` column ready), hybrid keyword search, incremental adds."
+    },
+    {
+      "id": "rag-003",
+      "priority": 5,
+      "area": "rag_playground",
+      "title": "RAG playground: hybrid (keyword + vector) search",
+      "user_visible_behavior": "`uv run rag-playground --hybrid` (also with --agentic) searches by keyword (BM25) as well as by vector and merges the two lists. The startup line says 'hybrid search' or 'vector search'. Without the flag nothing changes.",
+      "status": "passing",
+      "verification": [
+        "Run ./init.sh.",
+        "Run `uv run rag-playground --hybrid` against the real document and compare the retrieved chapters with a run without the flag on questions about rare names."
+      ],
+      "evidence": [
+        "2026-11-11: ./init.sh exit 0, pytest 112 passed (2 new: hybrid finds an exact name that vector search ranks last; hybrid with the numpy store raises).",
+        "2026-11-11: real index, 657 chunks. 14 questions 'Who or what is <name>?' for names found in 1 or 2 chunks: name in the top 5 for 11/14 with vector search and 14/14 with hybrid; chunks containing the name retrieved 14/18 and 18/18. Top result unchanged on 5 common questions. About 16 ms per search either way. Keyword index build is included in the ~50 ms table load.",
+        "2026-11-11: `uv run rag-playground --hybrid` answered 'Who is Imogene?' from Chapter 8; `RAG_STORE=numpy ... --hybrid` exits with a clear ValueError."
+      ],
+      "notes": "LanceDB native FTS index on the `text` column with default settings, merged by LanceDB's default reciprocal rank fusion. Opt-in, because there is no eval set yet to show it is better overall: the measurement only checks that the name appears in a retrieved chunk, not that the answer is right. Not built: reranking, query rewriting, the eval set."
     }
   ]
 }

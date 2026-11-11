@@ -10,13 +10,15 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Ask questions about the D&D campaign.")
     parser.add_argument("--agentic", action="store_true", help="let the model decide to search")
+    parser.add_argument("--hybrid", action="store_true", help="search by keyword as well as vector")
     args = parser.parse_args()
 
-    index = load_index()
+    index = load_index(hybrid=args.hybrid)
     agent = rag.agentic(index) if args.agentic else None
 
     mode = "Agentic" if args.agentic else "Two-step"
-    print(f"{mode} RAG over {len(index.chunks)} chunks ({index.store}).")
+    search = "hybrid" if args.hybrid else "vector"
+    print(f"{mode} RAG over {len(index.chunks)} chunks ({index.store}, {search} search).")
     while True:
         query = input("You: ")
         if query.lower() in ("exit", "quit"):

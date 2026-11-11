@@ -37,6 +37,7 @@ running on Ollama. Put the `.docx` in the git-ignored `data/rag/` folder (see `R
 ollama pull bge-m3
 uv run rag-playground             # two-step: always retrieve 5 chunks, then answer
 uv run rag-playground --agentic   # the model calls search_campaign when and as often as it wants
+uv run rag-playground --hybrid    # search by keyword as well as by vector (works with --agentic)
 ```
 
 The document is split on its heading styles and packed into ~300-word chunks that start with
@@ -45,7 +46,9 @@ their chapter title. The first run embeds them (a minute or two) into
 Search is cosine similarity over all chunks, run in a [LanceDB](https://lancedb.com) table
 (`data/rag/<name>.lancedb`, rebuilt from the `.npz` at each start). Set `RAG_STORE=numpy` to
 skip the database and search the same vectors directly in numpy; both return the same chunks,
-and the startup line says which one is in use. Both modes print which chapters were retrieved, so you
+and the startup line says which one is in use. `--hybrid` adds LanceDB's keyword (BM25)
+search and merges it with the vector results, which finds rare invented names that the
+embedding model misses; it needs the LanceDB store. Both modes print which chapters were retrieved, so you
 can see why an answer came out the way it did. Two-step answers each question on its own;
 agentic keeps the conversation. `loader.py` knows this document's heading style names
 (`SamKop`, `Samkop2`); change them there for another document.

@@ -85,6 +85,23 @@ def test_lancedb_and_numpy_return_the_same_chunks_in_the_same_order(tmp_path):
     assert in_lancedb.search("anything", k=3) == in_numpy == [chunks[0], chunks[2], chunks[3]]
 
 
+def test_hybrid_search_finds_an_exact_name_the_vector_search_ranks_last(tmp_path):
+    raw = np.eye(8, dtype=np.float32)[:4] + np.array([[0.9], [0.1], [0.5], [0.3]], dtype=np.float32)
+    vectors = raw / np.linalg.norm(raw, axis=1, keepdims=True)
+    chunks = ["Ch 0\nthe swamp", "Ch 1\nthe city of Ksenrae", "Ch 2\nthe road", "Ch 3\nthe sea"]
+    embedder = Embedder(TestEmbeddingModel())
+    table = lance_table(tmp_path / "db", chunks, vectors)
+    assert chunks[1] not in Index(chunks, vectors, embedder, table).search("Ksenrae?", k=2)
+    assert chunks[1] in Index(chunks, vectors, embedder, table, hybrid=True).search("Ksenrae?", k=2)
+
+
+def test_hybrid_search_needs_the_lancedb_store(tmp_path):
+    with pytest.raises(ValueError, match="Hybrid"):
+        load_index(
+            make_docx(tmp_path / "c.docx", DOC), Embedder(TestEmbeddingModel()), "numpy", True
+        )
+
+
 def test_sources_lists_each_section_once():
     assert rag.sources(["Ch 1\na", "Ch 2\nb", "Ch 1\nc"]) == "Ch 1; Ch 2"
 
