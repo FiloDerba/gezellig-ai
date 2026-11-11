@@ -76,15 +76,17 @@ def relations_tool(graph: Graph) -> Callable[[str], str]:
     def campaign_relations(name: str) -> str:
         """Look up how one named character, place, faction or item is related to others.
 
-        Returns one line per relation, "A | relation | B (chapter it comes from)", gathered
-        from the whole campaign. Pass a single name, as it is written in the story.
+        Returns one line per relation, "A | relation | B (chapter): sentence it comes from",
+        gathered from the whole campaign. Judge each relation by its sentence. Pass a single
+        name, as it is written in the story.
         """
         found = graph.about(name)
         print(f"  [campaign_relations({name!r}) -> {len(found)} relations]")
         if not found:
             return f"Nothing in the graph about {name!r}. Try search_campaign."
         lines = [
-            f"{row['source']} | {row['relation']} | {row['target']} ({row['section']})"
+            f"{row['source']} | {row['relation']} | {row['target']} ({row['section']}): "
+            f'"{row["quote"]}"'
             for row in found[:MAX_RELATIONS]
         ]
         if len(found) > MAX_RELATIONS:

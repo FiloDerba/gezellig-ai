@@ -7,6 +7,7 @@ in a JSON file next to the index and looked up by name at question time, with no
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -25,7 +26,8 @@ first-person story with world-building sections. The first line of the excerpt i
 Return the relations between named entities (characters, places, factions, gods, items,
 events) that the excerpt states. Rules:
 - Use names exactly as written. Skip anything that has no name ("the guard", "a city").
-- The narrator ("I", "me") is written as "the narrator" unless the excerpt gives their name.
+- In a first-person excerpt the narrator ("I", "me") is written as "the narrator", unless the
+  excerpt gives their name. World-building sections have no narrator: never use it there.
 - `relation` is a short phrase in the present tense: "lives in", "leads", "is the brother of".
 - Both ends must be names. Never use a relation as a way to describe one entity.
 - Keep lasting facts: who someone is, family, allegiance, rank, where a place is, who rules
@@ -33,13 +35,19 @@ events) that the excerpt states. Rules:
   (walking, talking, blows in a fight) and feelings.
 - Only relations the text states. No guesses, no general knowledge. Many excerpts are pure
   action and have none: return an empty list for those.
+- `quote` is the one sentence of the excerpt that states the relation, copied word for word.
+  Leave the relation out if no sentence states it.
 """
+
+FIRST_PERSON = re.compile(r"\b(I|me|my|we|us|our)\b")
+QUOTES = str.maketrans("‘’“”", "''\"\"")
 
 
 class Relation(BaseModel):
     source: str = Field(description="Named entity the relation starts from")
     relation: str = Field(description="Short phrase, present tense")
     target: str = Field(description="Named entity the relation points to")
+    quote: str = Field(description="Sentence of the excerpt that states it, word for word")
 
 
 Extractor = Agent[None, list[Relation]]
@@ -61,9 +69,30 @@ def extract(agent: Extractor, chunk: str) -> list[Relation]:
     return agent.run_sync(chunk).output
 
 
+def _plain(text: str) -> str:
+    """Lower case, straight quotes, single spaces: how names and quotes are compared to text."""
+    return " ".join(text.translate(QUOTES).casefold().split())
+
+
+def stated(relation: Relation, chunk: str) -> bool:
+    """Whether `chunk` backs the relation: it contains the quote and both names.
+
+    This drops relations the model made up, ends that are not names ("unknown", "a burial
+    site") and a narrator in text that has none. It does not check that the quote means
+    what the relation says.
+    """
+    text = _plain(chunk)
+    names = {_plain(relation.source), _plain(relation.target)}
+    if FIRST_PERSON.search(chunk):
+        names.discard("the narrator")  # the one name that is not written in the text
+    # The model shortens long sentences with "...": every piece it kept must be in the text.
+    pieces = [piece.strip() for piece in re.split(r"\.\.\.|…", _plain(relation.quote))]
+    return any(pieces) and all(piece in text for piece in pieces + sorted(names))
+
+
 class Graph:
     def __init__(self, relations: list[dict[str, str]]):
-        """`relations` are dicts with source, relation, target and the section they came from."""
+        """`relations` are dicts: source, relation, target, the quote that states it, section."""
         self.relations = relations
 
     def about(self, name: str) -> list[dict[str, str]]:
@@ -86,13 +115,15 @@ class Graph:
 def load_graph(
     chunks: list[str], doc: str | Path | None = None, agent: Extractor | None = None
 ) -> Graph:
-    """The graph for `chunks`, extracted on first use and reused until they or the model change.
+    """The graph for `chunks`, extracted on first use and reused until they, the model or the
+    prompt change.
 
-    Progress is saved after every chunk, so an interrupted run continues where it stopped.
+    Relations the chunk does not back (see `stated`) are left out. Progress is saved after
+    every chunk, so an interrupted run continues where it stopped.
     """
     agent = agent or extractor()
     name = getattr(agent.model, "model_name", agent.model)
-    key = f"{name}:{hashlib.sha256(chr(0).join(chunks).encode()).hexdigest()}"
+    key = f"{name}:{hashlib.sha256(chr(0).join([PROMPT, *chunks]).encode()).hexdigest()}"
     cache = doc_path(doc).with_suffix(".graph.json")
     saved = json.loads(cache.read_text()) if cache.exists() else {}
     if saved.get("key") != key:
@@ -100,7 +131,7 @@ def load_graph(
     if saved["done"] == len(chunks):
         return Graph(saved["relations"])
 
-    skipped = 0
+    skipped = dropped = 0
     for number, chunk in enumerate(chunks[saved["done"] :], start=saved["done"]):
         print(f"\rExtracting relations {number}/{len(chunks)} chunks...", end="", flush=True)
         section = chunk.partition("\n")[0]
@@ -108,11 +139,13 @@ def load_graph(
             found = extract(agent, chunk)
         except UnexpectedModelBehavior:  # the model's output was not usable: leave this chunk out
             found, skipped = [], skipped + 1
-        saved["relations"] += [{**relation.model_dump(), "section": section} for relation in found]
+        backed = [relation for relation in found if stated(relation, chunk)]
+        dropped += len(found) - len(backed)
+        saved["relations"] += [{**relation.model_dump(), "section": section} for relation in backed]
         saved["done"] = number + 1
         partial = cache.with_suffix(".tmp")
         partial.write_text(json.dumps(saved))
         partial.replace(cache)  # never leaves a half-written file behind
-    note = f" ({skipped} chunks skipped)" if skipped else ""
+    note = f" ({skipped} chunks skipped, {dropped} relations dropped as not in the text)"
     print(f"\rExtracted {len(saved['relations'])} relations from {len(chunks)} chunks{note}.    ")
     return Graph(saved["relations"])

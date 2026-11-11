@@ -125,8 +125,14 @@ def test_agentic_agent_calls_search_campaign(capsys):
     assert "search_campaign(" in capsys.readouterr().out
 
 
-NERWEN = Relation(source="Nerwen", relation="banished", target="Old Gods of Chaos")
-CHUNKS = ["History\nNerwen banished the Old Gods.", "Chapter 1\nWe walked.", "Chapter 2\nAgain."]
+NERWEN = Relation(
+    source="Nerwen", relation="banished", target="Old Gods", quote="Nerwen banished the Old Gods."
+)
+CHUNKS = [
+    "History\nNerwen banished the Old Gods.",
+    "Chapter 1\nWe walked.",
+    "Chapter 2\nIt’s said: Nerwen banished the Old Gods.",
+]
 
 
 def test_extractor_returns_relations():
@@ -134,12 +140,27 @@ def test_extractor_returns_relations():
     assert graph.extract(graph.extractor(model), CHUNKS[0]) == [NERWEN]
 
 
+def test_stated_needs_the_quote_and_both_names_in_the_chunk():
+    def changed(**fields):
+        return NERWEN.model_copy(update=fields)
+
+    assert graph.stated(NERWEN, CHUNKS[0])
+    assert graph.stated(changed(quote="NERWEN banished ... Old Gods"), CHUNKS[0])  # shortened
+    assert graph.stated(changed(quote="It's said: Nerwen banished"), CHUNKS[2])  # straight quote
+    assert not graph.stated(changed(quote="Nerwen destroyed the Old Gods."), CHUNKS[0])
+    assert not graph.stated(changed(quote=""), CHUNKS[0])
+    assert not graph.stated(changed(target="Old Gods of Chaos"), CHUNKS[0])
+    assert not graph.stated(changed(source="the narrator"), CHUNKS[0])  # no "I" in this text
+    assert graph.stated(changed(source="the narrator"), CHUNKS[0] + " I saw it.")
+
+
 def test_load_graph_extracts_once_then_reuses_the_cache(tmp_path, monkeypatch, capsys):
     calls = []
     monkeypatch.setattr(graph, "extract", lambda agent, chunk: calls.append(chunk) or [NERWEN])
     agent = graph.extractor(TestModel())
     first = load_graph(CHUNKS, tmp_path / "c.docx", agent)
-    assert "Extracted 3 relations from 3 chunks." in capsys.readouterr().out
+    # Chapter 1 does not contain the quote, so its relation is left out.
+    assert "Extracted 2 relations from 3 chunks (0 chunks skipped, 1 rel" in capsys.readouterr().out
     assert first.relations[0] == {**NERWEN.model_dump(), "section": "History"}
     second = load_graph(CHUNKS, tmp_path / "c.docx", agent)
     assert capsys.readouterr().out == ""
@@ -170,7 +191,7 @@ def test_load_graph_continues_after_an_interruption_and_skips_unusable_output(
     resumed = load_graph(CHUNKS, tmp_path / "c.docx", agent)
     assert seen == CHUNKS[1:]  # the first chunk was not read again
     assert [row["section"] for row in resumed.relations] == ["History", "Chapter 2"]
-    assert "(1 chunks skipped)" in capsys.readouterr().out
+    assert "(1 chunks skipped, 0 relations dropped" in capsys.readouterr().out
 
 
 def test_graph_finds_a_name_at_either_end_once():
@@ -194,8 +215,8 @@ def test_graph_finds_a_name_at_either_end_once():
 
 
 def test_agentic_agent_with_a_graph_can_look_up_relations(capsys):
-    rows = [{**NERWEN.model_dump(), "section": "History"}]
-    model = TestModel(call_tools=["campaign_relations"])
+    rows = [{**NERWEN.model_dump(), "target": "Ancora", "section": "History"}]
+    model = TestModel(call_tools=["campaign_relations"])  # it looks up the name "a"
     output, _ = rag.agentic(fake_index(), model, Graph(rows)).run("Who is Nerwen?")
     assert output
     assert "campaign_relations('a') -> 1 relations" in capsys.readouterr().out
@@ -203,11 +224,11 @@ def test_agentic_agent_with_a_graph_can_look_up_relations(capsys):
 
 def test_relations_tool_caps_long_results_and_says_when_nothing_is_found():
     rows = [
-        {"source": "Nerwen", "relation": f"knows {n}", "target": "Cirdan", "section": "History"}
+        {**NERWEN.model_dump(), "relation": f"knows {n}", "section": "History"}
         for n in range(rag.MAX_RELATIONS + 2)
     ]
     lookup = rag.relations_tool(Graph(rows))
     lines = lookup("Nerwen").splitlines()
-    assert lines[0] == "Nerwen | knows 0 | Cirdan (History)"
+    assert lines[0] == 'Nerwen | knows 0 | Old Gods (History): "Nerwen banished the Old Gods."'
     assert len(lines) == rag.MAX_RELATIONS + 1 and lines[-1] == "... and 2 more"
     assert "Nothing in the graph" in lookup("Vecna")
