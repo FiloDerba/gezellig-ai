@@ -4,7 +4,7 @@ General notes on building with LLMs, written as I work through the
 [checklist](ai-learning-checklist.md). Each section ends with what was actually tried in this
 repo, so the claims can be traced back to something that ran.
 
-Last updated: 2026-11-10.
+Last updated: 2026-11-17.
 
 ## Contents
 
@@ -17,6 +17,9 @@ Last updated: 2026-11-10.
 - [Vector databases](#vector-databases)
 - [Hybrid search and reranking](#hybrid-search-and-reranking)
 - [Knowledge graphs](#knowledge-graphs)
+- [Context engineering](#context-engineering)
+- [Evals](#evals)
+- [MCP](#mcp)
 - [RAG vs fine-tuning](#rag-vs-fine-tuning)
 - [Choosing a model: speed against quality](#choosing-a-model-speed-against-quality)
 - [Testing and shipping habits](#testing-and-shipping-habits)
@@ -457,6 +460,89 @@ no cluster summaries (`rag_playground/graph.py`). What building it on the campai
   the Undying", as four separate names. Some relations are wrong: a world-building section
   has no narrator, yet the graph says the narrator slew a dragon god there.
 
+## Context engineering
+
+Prompt engineering is how you word the request. Context engineering is everything else the
+model sees on that call: system prompt, tool descriptions, tool results and the conversation
+so far. The model knows nothing outside that window, and it reads all of it every time, so
+the job is to put in what the answer needs and keep out the rest.
+
+What goes into one agentic call here, in order:
+
+1. **System prompt**: role, rules ("answer only from the excerpts, say so when they don't
+   cover it"), and a short description of the campaign.
+2. **Tool descriptions**: the function's docstring and argument names. This is the only
+   manual the model gets, so it says when to use the tool, not just what it does
+   ("search for one thing at a time").
+3. **History**: every earlier question, answer and tool result.
+4. **The question.**
+
+Things this repo does to keep the window useful:
+
+- **Cap tool results.** A common name has hundreds of graph relations or grep hits. The
+  tools return at most 60 relations or 30 grep hits, then "... and N more", so the model
+  knows there is more and can ask more precisely.
+- **Return the part that matters.** The first grep tool returned whole paragraphs: 8,243
+  words for "Vecna|Cevan". Returning 200 characters around each match brought it to 2,134,
+  about what five vector chunks cost (~1,250).
+- **Label every piece.** Each chunk starts with its chapter title, so the model can cite it
+  and tell two similar passages apart.
+- **Say what failed.** "No paragraph matches 'X'. Try other spellings or search_campaign."
+  works better than an empty string, because the model knows what to try next.
+- **Watch the history.** Each request resends the whole conversation. Here, a follow-up
+  question that needed no search still sent 2,275 input tokens, mostly the passages
+  retrieved for the first question. Long chats get slower and costlier per turn, and older
+  material can crowd out the new. Fixes are trimming old tool results or summarising
+  earlier turns; neither is built here yet.
+
+*In this repo:* every answer prints its token use (`[tokens: 2 requests, 2,586 in, 485
+out; conversation: ...]`), and the Assistant page shows it in its status line.
+
+## Evals
+
+An eval is a fixed set of questions with known right answers, run the same way after every
+change. Without one, "this is better" means "this looked better on the two questions I
+tried".
+
+- **Measure the parts separately.** Retrieval can be scored exactly and in seconds: did a
+  passage that holds the answer come back? Answer quality needs a human or a judging model,
+  which is slower and noisier. Fix retrieval first; a model cannot answer from a passage it
+  never saw.
+- **Mix question types.** Questions that contain the answer's own words favour keyword
+  search. Paraphrased ones ("the giant worm on the ice" for a Remorhaz) test meaning.
+- **Make it hard enough.** If every method scores 15 or 16 out of 16, the set cannot tell
+  them apart; a one-question gap is noise.
+- **Count the cost too.** Report words returned and time next to hits: a method that finds
+  more by returning twice as much text is not simply better.
+
+*In this repo:* `uv run rag-eval`, 16 questions: vector 15/16, hybrid 16/16, grep 15/16.
+Grep missed a paraphrase because the chapter says "invitation" only in its title.
+
+## MCP
+
+The Model Context Protocol is a standard way to offer tools to any model application. A tool
+written once as an MCP server works in Claude Code, Claude Desktop, IDEs and your own agents,
+instead of being rewritten for each one.
+
+- **Server and client.** The server lists its tools (name, description, argument schema) and
+  runs them; the client, inside the AI app, passes them to the model and forwards its calls.
+- **Transports.** stdio: the client starts the server as a subprocess and talks over
+  stdin/stdout, which suits local tools. HTTP: the server runs on its own, which suits shared
+  or remote tools and needs auth.
+- **On stdio, stdout belongs to the protocol.** Any `print` breaks it; send logs to stderr.
+- **Besides tools**, servers can offer resources (files or data to read) and prompts
+  (templates). Tools are what most servers use.
+- **Annotations** such as read-only tell the client which tools are safe to run without
+  asking.
+- **Trust.** A server runs code on your machine, and its tool results go into the model's
+  context, so only add servers you trust, and treat what they return as data, not
+  instructions.
+
+*In this repo:* `uv run rag-mcp [--hybrid]` serves `search_campaign` and `grep_campaign` as
+read-only tools. A pydantic-ai agent given only that server as a toolset
+(`MCPToolset(StdioTransport("uv", ["run", "rag-mcp"]))`) answered a campaign question
+correctly. For Claude Code: `claude mcp add campaign -- uv run --project <repo> rag-mcp`.
+
 ## RAG vs fine-tuning
 
 **RAG gives the model facts to read at question time. Fine-tuning changes how the model
@@ -543,6 +629,8 @@ Useful commands: `ollama list` (installed), `ollama ps` (loaded right now),
 | Agent | A model in a loop that decides which tools to call and when to stop. |
 | Hallucination | A confident answer that is not supported by the source or by fact. |
 | Eval | A fixed set of questions with expected answers, used to measure quality. |
+| Context engineering | Choosing everything that goes into the model's window on a call. |
+| MCP | Model Context Protocol: a standard for offering tools to any AI app. |
 | Fine-tuning | Further training of a model on your own examples. |
 | Quantization | Storing model weights at lower precision to shrink it and speed it up. |
 

@@ -17,6 +17,7 @@ anything you want to revisit.
 - [ ] Understand an API before an agent
 - [ ] Learn how an LLM works, not just the chat
 - [ ] Tokens, context windows and sampling (temperature) *(added)*
+  - [x] Token use printed for every answer
 - [ ] Prompting basics: system prompts, few-shot examples *(added)*
 - [x] Run a model locally and compare models on speed against quality *(added)*
       → [wiki](ai-engineering-wiki.md#choosing-a-model-speed-against-quality)
@@ -42,9 +43,10 @@ anything you want to revisit.
   - [x] Hybrid (keyword + vector) search
   - [x] Grep: exact regex search as an agent tool, no index *(added)*
   - [ ] Reranking
-- [ ] Context engineering: deciding what goes into the prompt and what stays out *(added)*
+- [x] Context engineering: deciding what goes into the prompt and what stays out *(added)*
+      → [wiki](ai-engineering-wiki.md#context-engineering)
 - [x] MCP (Model Context Protocol): the standard way to expose tools to agents *(added)*
-      → `uv run rag-mcp` serves the campaign search tools
+      → [wiki](ai-engineering-wiki.md#mcp)
 
 ## Stage 3: Build one real agent
 
@@ -64,6 +66,7 @@ anything you want to revisit.
 - [ ] Add observability
 - [ ] Add evals
   - [x] Retrieval eval: does each search return the section that answers? (`rag-eval`)
+        → [wiki](ai-engineering-wiki.md#evals)
 - [ ] Break it with real failures
 - [ ] Defend against prompt injection (text the agent reads is not instructions) *(added)*
 - [x] Test without the network (fake models) and run the tests in CI *(added)*
@@ -99,3 +102,4 @@ anything you want to revisit.
 | Date | What I did | What I learned |
 |---|---|---|
 | 2026-11-10 | Built `src/rag_playground/`: two-step and agentic RAG over my 161k-word D&D campaign summary, on local Ollama models. Timed gemma against qwen. Moved the vectors into LanceDB with numpy as fallback. Added a PR rule, CI and pre-commit to the repo. | Retrieval is cheap, the chat model is the slow part. A small fast model answers simple lookups fine but searches once and stops on questions that span chapters. 657 vectors need no vector database. RAG is for facts, fine-tuning is for behaviour. |
+| 2026-11-17 | Added a grep tool, a retrieval eval (`rag-eval`), token counts on every answer, and an MCP server for the campaign tools (`rag-mcp`). | Grep is tiny and exact but misses anything worded differently. Every mode scored 15–16/16, so the eval needs harder questions before it can judge a reranker. The whole history is resent every turn: a follow-up with no search still cost 2,275 input tokens. |
