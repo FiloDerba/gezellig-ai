@@ -1,12 +1,14 @@
+import asyncio
 import zipfile
 
 import numpy as np
 import pytest
+from mcp.types import CallToolResult, TextContent
 from pydantic_ai import Embedder, UnexpectedModelBehavior
 from pydantic_ai.embeddings import TestEmbeddingModel
 from pydantic_ai.models.test import TestModel
 
-from rag_playground import evaluate, graph, loader, rag
+from rag_playground import evaluate, graph, loader, mcp_server, rag
 from rag_playground.graph import Graph, Relation, load_graph
 from rag_playground.index import Index, lance_table, load_index, top_k
 
@@ -161,6 +163,19 @@ def test_score_counts_a_hit_when_a_result_is_in_an_expected_section():
     assert words == 9 / 2  # "Chapter 1: A temple: The swamp smelled of decay." for Q1 only
     missed, _, _ = evaluate.score(questions, evaluate.by_index(fake_index()))
     assert [q["question"] for q in missed] == ["Q2"]
+
+
+def test_mcp_server_offers_both_tools_read_only_and_keeps_stdout_clean(capsys):
+    server = mcp_server.server(fake_index())
+    tools = {tool.name: tool for tool in asyncio.run(server.list_tools())}
+    assert set(tools) == {"search_campaign", "grep_campaign"}
+    assert list(tools["grep_campaign"].input_schema["properties"]) == ["pattern"]
+    assert all(tool.annotations and tool.annotations.read_only_hint for tool in tools.values())
+    result = asyncio.run(server.call_tool("grep_campaign", {"pattern": "swamp"}))
+    assert isinstance(result, CallToolResult) and isinstance(text := result.content[0], TextContent)
+    assert text.text == "Chapter 1: A temple: The swamp smelled of decay."
+    out = capsys.readouterr()
+    assert out.out == "" and "grep_campaign('swamp')" in out.err  # stdout is the protocol
 
 
 NERWEN = Relation(

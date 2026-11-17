@@ -15,7 +15,7 @@ dependencies = [
     "numpy>=2.5.2",
     "pandas>=2.3.0",
     "psycopg[binary]>=3.2.12",
-    "pydantic-ai-slim[anthropic,google,openai]>=2.32.1",
+    "pydantic-ai-slim[anthropic,google,mcp,openai]>=2.32.1",
     "python-dotenv>=1.2.3",
     "streamlit>=1.63.0",
     "tavily-python>=0.7.27",
@@ -25,6 +25,7 @@ dependencies = [
 gezellig-ai = "ai_playground:main"
 rag-playground = "rag_playground:main"
 rag-eval = "rag_playground.evaluate:main"
+rag-mcp = "rag_playground.mcp_server:main"
 
 [build-system]
 requires = ["uv_build>=0.9.17,<0.10.0"]

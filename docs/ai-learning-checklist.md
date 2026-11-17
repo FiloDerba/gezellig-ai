@@ -43,7 +43,8 @@ anything you want to revisit.
   - [x] Grep: exact regex search as an agent tool, no index *(added)*
   - [ ] Reranking
 - [ ] Context engineering: deciding what goes into the prompt and what stays out *(added)*
-- [ ] MCP (Model Context Protocol): the standard way to expose tools to agents *(added)*
+- [x] MCP (Model Context Protocol): the standard way to expose tools to agents *(added)*
+      → `uv run rag-mcp` serves the campaign search tools
 
 ## Stage 3: Build one real agent
 
