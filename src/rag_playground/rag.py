@@ -8,7 +8,7 @@ from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai.models import Model
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from ai_playground.agent import DEFAULT_MODEL
+from ai_playground.agent import DEFAULT_MODEL, token_usage
 from ai_playground.agent import Agent as PlaygroundAgent
 from rag_playground.graph import Graph
 from rag_playground.index import Index, ollama
@@ -61,7 +61,9 @@ def two_step(index: Index, question: str, model: Model | str | None = None, k: i
     model = model or OpenAIChatModel(model_name(), provider=ollama())
     agent = PydanticAgent(model, system_prompt="You answer questions about a D&D campaign." + RULES)
     excerpts = "\n\n---\n\n".join(found)
-    return agent.run_sync(f"Excerpts:\n\n{excerpts}\n\nQuestion: {question}").output
+    result = agent.run_sync(f"Excerpts:\n\n{excerpts}\n\nQuestion: {question}")
+    print(f"  [tokens: {token_usage(result.new_messages())}]")
+    return result.output
 
 
 def search_tool(index: Index) -> Callable[[str], str]:
@@ -91,6 +93,18 @@ def snippet(line: str, match: re.Match[str]) -> str:
     return ("..." if start else "") + line[start:end] + ("..." if end < len(line) else "")
 
 
+def grep(chunks: list[str], pattern: str) -> list[tuple[str, str]]:
+    """(section title, text around the first match) for every paragraph matching `pattern`."""
+    regex = re.compile(pattern, re.IGNORECASE)
+    return [
+        (title, snippet(line, match))
+        for chunk in chunks
+        for title, _, body in [chunk.partition("\n")]
+        for line in body.splitlines()
+        if (match := regex.search(line))
+    ]
+
+
 def grep_tool(chunks: list[str]) -> Callable[[str], str]:
     def grep_campaign(pattern: str) -> str:
         """Find every paragraph of the campaign that matches a regular expression.
@@ -101,16 +115,9 @@ def grep_tool(chunks: list[str]) -> Callable[[str], str]:
         mention of something across the story.
         """
         try:
-            regex = re.compile(pattern, re.IGNORECASE)
+            found = [f"{title}: {text}" for title, text in grep(chunks, pattern)]
         except re.error as error:
             return f"Not a valid regular expression: {error}. Fix the pattern and try again."
-        found = [
-            f"{title}: {snippet(line, match)}"
-            for chunk in chunks
-            for title, _, body in [chunk.partition("\n")]
-            for line in body.splitlines()
-            if (match := regex.search(line))
-        ]
         print(f"  [grep_campaign({pattern!r}) -> {len(found)} paragraphs]")
         if not found:
             return f"No paragraph matches {pattern!r}. Try other spellings or search_campaign."

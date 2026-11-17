@@ -4,15 +4,28 @@ from datetime import date as _date
 
 from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai import RunContext
+from pydantic_ai.messages import ModelMessage, ModelResponse
 from pydantic_ai.models import Model
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.usage import RequestUsage
 from tavily import TavilyClient
 
 from ai_playground.prompts import goal, instructions, knowledge, role
 
 DEFAULT_MODEL = "qwen3.6:35b-a3b"
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
+
+
+def token_usage(messages: Sequence[ModelMessage]) -> str:
+    """Token use of the model responses in `messages`: "2 requests, 1,204 in, 88 out".
+
+    Every request resends the whole conversation, so input tokens grow with its length.
+    """
+    usages = [message.usage for message in messages if isinstance(message, ModelResponse)]
+    total = sum(usages, RequestUsage())
+    requests = f"{len(usages)} request" + "s" * (len(usages) != 1)
+    return f"{requests}, {total.input_tokens:,} in, {total.output_tokens:,} out"
 
 
 class Agent:
