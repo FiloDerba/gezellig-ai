@@ -27,7 +27,7 @@ anything you want to revisit.
 - [ ] Learn RAG → [wiki](ai-engineering-wiki.md#rag)
   - [x] Standard RAG: retrieve relevant info and pass it to the prompt
   - [x] Agentic RAG: retrieve through a tool
-  - [ ] Knowledge graph
+  - [x] Knowledge graph → [wiki](ai-engineering-wiki.md#knowledge-graphs)
 - [x] Learn embeddings and vector search
       → [wiki](ai-engineering-wiki.md#embeddings-and-vector-search)
 - [x] Compare embedding models: dimensions, max input length, languages *(added)*

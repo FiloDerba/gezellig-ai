@@ -16,6 +16,7 @@ Last updated: 2026-11-10.
 - [Two-step against agentic RAG](#two-step-against-agentic-rag)
 - [Vector databases](#vector-databases)
 - [Hybrid search and reranking](#hybrid-search-and-reranking)
+- [Knowledge graphs](#knowledge-graphs)
 - [RAG vs fine-tuning](#rag-vs-fine-tuning)
 - [Choosing a model: speed against quality](#choosing-a-model-speed-against-quality)
 - [Testing and shipping habits](#testing-and-shipping-habits)
@@ -276,17 +277,185 @@ keyword search for the hybrid experiment.
 
 ## Hybrid search and reranking
 
-Not built here yet. These are the standard fixes for weak retrieval.
+These are the standard fixes for weak retrieval. Hybrid search is built here; the other two
+are not.
 
 - **Hybrid search** runs a keyword search (BM25) next to the vector search and merges the
   two result lists. Keywords catch exact names and codes that embeddings blur. Expect this
-  to matter for invented names like "Ksenrae".
+  to matter for invented names. The usual merge is **reciprocal rank fusion**: each chunk
+  scores `1 / (60 + rank)` in each list and the sums are sorted, so only positions count,
+  not the two kinds of score.
 - **Reranking** retrieves generously (say 50 chunks) and then has a second, slower model
   (a cross-encoder) score each chunk against the question, keeping the best 5. It reads the
   question and chunk together, so it judges relevance better than vector distance alone.
 - **Query rewriting** has the model rephrase the question before searching. One variant,
   HyDE, writes a made-up answer and searches with that, because an answer looks more like
   the stored passages than a question does.
+
+They sit at different stages of one pipeline, so they combine:
+
+```
+question → (rewrite) → vector + keyword search → merge → ~50 chunks → (rerank) → best 5 → model
+```
+
+### How hybrid search works
+
+**Why vector search is not enough.** The embedding model has never seen an invented name,
+so it turns it into a vague vector. A chunk that contains the name can rank below chunks
+that are only about a similar topic.
+
+**Keyword search (BM25)** scores a chunk by the question's exact words. Three things set the
+score:
+
+- **Rare words count most.** A word found in 2 chunks out of 657 says far more than "the" or
+  "who", which are in almost all of them. This is why it is strong on invented names.
+- **More mentions help, but less each time.** Ten mentions do not score ten times one.
+- **Long chunks are scaled down**, so a chunk does not win only by containing more words.
+
+It needs no model: it is an index from each word to the chunks containing it, so it is fast
+to build and to search.
+
+**Merging.** The two scores cannot be added: cosine similarity is between -1 and 1, a BM25
+score has no upper limit. Reciprocal rank fusion ignores the scores and uses positions:
+
+| Chunk | Vector rank | Keyword rank | Score |
+|---|---|---|---|
+| A | 1 | not found | 1/61 = 0.0164 |
+| B | 2 | 3 | 1/62 + 1/63 = 0.0320 |
+| C | not found | 1 | 1/61 = 0.0164 |
+
+B wins because both searches agree on it. A and C still get through, each on the strength
+of one search. The 60 is a convention; it keeps the top position from dominating.
+
+**What each side is good at:**
+
+| | Vector search | Keyword search |
+|---|---|---|
+| Finds | The same meaning in different words | The exact word |
+| Good for | "What destroyed the continent?" | Names, codes, numbers, rare terms |
+| Misses | Rare and invented names | Synonyms, paraphrases, other spellings |
+
+**Limits.** Keyword search matches spelling, so a typo or a second spelling of a name
+("Rhosghonel" and "Rhosgonel" both occur in the campaign) is a miss for it. Hybrid search
+also cannot fix a question that has no useful words in it; that is what query rewriting is
+for. And the merge can push out a good vector result in favour of a chunk that only repeats
+a word from the question, so measure it on your own questions before making it the default.
+
+*In this repo:* `uv run rag-playground --hybrid`. LanceDB builds the keyword index on the
+`text` column and does the merge (`rag_playground/index.py`). Measured on 14 names that occur
+in only one or two of the 657 chunks ("Who or what is Vaxumbria?"): vector search had the
+name somewhere in its top 5 for 11 of 14 questions, hybrid for 14 of 14, at the same speed.
+Names that occur often ("Ksenrae", in 44 chunks) were already found by vector search alone,
+so the gain is on the rare ones.
+
+### How reranking works
+
+**The problem.** The first search is fast but rough. The right chunk is often somewhere in
+the top 50, just not in the top 5 that the model gets to read.
+
+**The fix.** Retrieve about 50 chunks, have a second model (a **cross-encoder**) score each
+one against the question, and keep the best 5.
+
+**Why the second model judges better.** The embedding model is a **bi-encoder**: it reads
+the question and the chunk separately. The cross-encoder reads them together.
+
+| | Bi-encoder (embedding model) | Cross-encoder (reranker) |
+|---|---|---|
+| Reads | Question and chunk separately | Question and chunk together |
+| Output | One vector per text | One relevance score per pair |
+| When the work is done | Chunks once, in advance | Every pair, at question time |
+| Speed | Fast: compare vectors | Slow: one model run per chunk |
+| Judgement | Rough: the chunk was summed up before any question existed | Sharper: can tell a chunk names the right person but answers another question |
+
+**Limits.**
+
+- It improves the order, not the reach: a chunk that is not in the 50 cannot be brought back.
+- It runs once per chunk for every question and nothing can be prepared in advance, so it
+  is only affordable on a shortlist, never on the whole collection.
+
+**How to tell if you need it.** With an eval set, check where the right chunk lands. If it
+is often in the top 50 but not in the top 5, rerank. If it is already in the top 5, skip it.
+
+*In this repo:* not built. The reasons:
+
+- **No evidence of a ranking problem yet.** Simple lookups already retrieve the right
+  chapter, and hybrid search fixed the one failure that was measured. The eval set comes
+  first.
+- **It would not help the multi-chapter questions.** Those need several searches, which is
+  what agentic mode does.
+- **Ollama cannot serve a reranker.** Version 0.40.16 answers 404 on `/api/rerank` and
+  `/v1/rerank` (checked 2026-11-11), and the upstream feature request has been open since
+  March 2024.
+
+The ways to run one locally anyway:
+
+| Option | Needs | Trade-off |
+|---|---|---|
+| LanceDB's built-in `CrossEncoderReranker` | `sentence-transformers` and `torch` | Fewest lines: it plugs into the hybrid query in `rag_playground/index.py`. A large dependency. |
+| A chat model as the judge | Nothing new | One model call per chunk, so 50 calls per question. Slow. |
+| A separate rerank server | llama.cpp's `llama-server`, which has `/v1/rerank` | A real reranker model, but a second service to run. |
+
+If it is built later, start with the LanceDB option. None of the three has been run here.
+
+## Knowledge graphs
+
+A knowledge graph stores **entities** (people, places, factions, events) and the
+**relations** between them, as triples: `Kallista | is the capital of | Carverun`. Using one
+for retrieval is called **GraphRAG**.
+
+**Why chunks are not enough.** A search returns the 5 passages closest to the question. That
+works when one passage holds the answer. It fails when the answer is spread thinly over the
+whole text ("who is connected to Kallista?") or needs several steps ("who leads the faction
+that the narrator's friend belongs to?").
+
+**How it is built.** A chat model reads every chunk once and writes down the relations it
+states. This happens at indexing time, so it is slow to build and needs no model to look up.
+
+| | Vector or keyword search | Knowledge graph |
+|---|---|---|
+| Stores | Passages of text | Facts pulled out of the text |
+| Built by | An embedding model, in about a minute here | A chat model, one call per chunk |
+| Answers well | "What happened at X?" | "How are X and Y related?", "what is connected to X?" |
+| Keeps | The author's exact words | Only what the model wrote down |
+| Fails when | The answer is spread over many passages | The model missed or misread a relation |
+
+**What makes it hard.**
+
+- **Extraction is noisy.** The model decides what counts as a relation. Without firm rules
+  it records every sword blow as one. A weak model produces nothing usable.
+- **Names must be matched.** "Rhosghonel" and "Rhosgonel" become two entities unless
+  someone merges them. So do "Nerwen" and "the goddess of love".
+- **Stories change.** An ally in chapter 6 is an enemy in chapter 30. A triple has no time
+  in it unless you store where it came from.
+- **The narrator.** In a first-person text most relations start at "I", which has to be
+  given a name.
+
+**Full GraphRAG goes further:** it groups related entities into clusters and writes a
+summary of each one, to answer questions about the whole text ("what are the main themes?").
+That is much more model work at indexing time.
+
+**Rule of thumb:** add a graph when you have questions about connections that the search
+demonstrably fails on. Keep the search: the graph says *that* two things are related and
+where, the passages say *what happened*.
+
+*In this repo:* `uv run rag-playground --agentic --graph`, a small version: triples in a
+JSON file, looked up by name through a `campaign_relations` tool, with no graph database and
+no cluster summaries (`rag_playground/graph.py`). What building it on the campaign showed:
+
+- **The model matters more than anything.** `gemma4:e4b` failed on 2 of 3 trial chunks.
+  `qwen3.8:27b` worked at 36 to 52 seconds a chunk. `qwen3.6:35b-a3b` with thinking switched
+  off gave cleaner relations and was much faster, so it builds the graph.
+- **Cost:** 118 minutes for 657 chunks, against about one minute to embed them. 23 chunks
+  (3.5%) were skipped because the model's output was unusable.
+- **Result:** 1,251 relations between 619 distinct names.
+- **It adds breadth.** Asked "who is connected to the city of Kallista?", the search alone
+  answered from 3 sections. With the graph the answer also named the governor, a resident
+  and a faction based there, facts that sit in other sections.
+- **It is not always needed.** "How are Cevan and Vecna connected?" was answered correctly
+  with and without the graph.
+- **The noise is real.** One villain appears as "Cevan", "Lord Cevan", "Vecna" and "Vecna
+  the Undying", as four separate names. Some relations are wrong: a world-building section
+  has no narrator, yet the graph says the narrator slew a dragon god there.
 
 ## RAG vs fine-tuning
 
@@ -369,6 +538,8 @@ Useful commands: `ollama list` (installed), `ollama ps` (loaded right now),
 | Top-k | The k closest chunks returned by a search. |
 | BM25 | The standard keyword-search scoring method. |
 | Reranker | A second model that re-scores retrieved chunks against the question. |
+| Knowledge graph | Entities and the relations between them, stored as triples. |
+| Indexing time | The preparation done once per document, before any question. |
 | Agent | A model in a loop that decides which tools to call and when to stop. |
 | Hallucination | A confident answer that is not supported by the source or by fact. |
 | Eval | A fixed set of questions with expected answers, used to measure quality. |

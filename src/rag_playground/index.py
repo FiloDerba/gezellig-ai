@@ -1,7 +1,8 @@
 """Embed the chunks once, keep them on disk, and search them by cosine similarity.
 
 The vectors are cached in an .npz file. Search runs in a LanceDB table built from that file,
-or directly in numpy with RAG_STORE=numpy. Both return the same chunks.
+or directly in numpy with RAG_STORE=numpy. Both return the same chunks. The LanceDB table
+can also run a hybrid search: the vector search plus a keyword search, merged.
 """
 
 import os
@@ -9,6 +10,7 @@ from pathlib import Path
 
 import lancedb
 import numpy as np
+from lancedb.index import FTS
 from pydantic_ai import Embedder
 from pydantic_ai.embeddings.openai import OpenAIEmbeddingModel
 from pydantic_ai.providers.ollama import OllamaProvider
@@ -31,6 +33,10 @@ def default_embedder() -> Embedder:
     return Embedder(OpenAIEmbeddingModel(name, provider=ollama()))
 
 
+def doc_path(doc: str | Path | None = None) -> Path:
+    return Path(doc or os.getenv("RAG_DOC") or DEFAULT_DOC)
+
+
 def _unit(vectors) -> np.ndarray:
     array = np.asarray(vectors, dtype=np.float32)
     return array / np.linalg.norm(array, axis=-1, keepdims=True)
@@ -42,7 +48,7 @@ def top_k(vectors: np.ndarray, query: np.ndarray, k: int) -> list[int]:
 
 
 def lance_table(path: str | Path, chunks: list[str], vectors: np.ndarray):
-    """A LanceDB table holding every chunk with its vector and section title."""
+    """A LanceDB table holding every chunk with its vector, section title and keyword index."""
     db = lancedb.connect(path)
     # shortcut: rebuilt from the .npz on every start (15 ms at 657 rows) so it can never be
     # stale; switch to adding only new rows when the corpus gets big.
@@ -51,13 +57,28 @@ def lance_table(path: str | Path, chunks: list[str], vectors: np.ndarray):
         {"vector": vector, "text": chunk, "section": chunk.partition("\n")[0]}
         for chunk, vector in zip(chunks, vectors, strict=True)
     ]
-    return db.create_table("chunks", data=rows)
+    table = db.create_table("chunks", data=rows)
+    table.create_index("text", config=FTS())  # the keyword (BM25) side of hybrid search
+    return table
 
 
 class Index:
-    def __init__(self, chunks: list[str], vectors: np.ndarray, embedder: Embedder, table=None):
-        """Searches `table` (LanceDB) when given, otherwise the vectors in numpy."""
+    def __init__(
+        self,
+        chunks: list[str],
+        vectors: np.ndarray,
+        embedder: Embedder,
+        table=None,
+        hybrid: bool = False,
+    ):
+        """Searches `table` (LanceDB) when given, otherwise the vectors in numpy.
+
+        With `hybrid`, the table also searches by keyword and merges the two result lists.
+        """
+        if hybrid and table is None:
+            raise ValueError("Hybrid search needs the LanceDB store (RAG_STORE=lancedb)")
         self.chunks, self.vectors, self.embedder, self.table = chunks, vectors, embedder, table
+        self.hybrid = hybrid
 
     @property
     def store(self) -> str:
@@ -67,18 +88,25 @@ class Index:
         vector = _unit(self.embedder.embed_query_sync(query).embeddings[0])
         if self.table is None:
             return [self.chunks[i] for i in top_k(self.vectors, vector, k)]
-        rows = self.table.search(vector).distance_type("cosine").limit(k).to_list()
-        return [row["text"] for row in rows]
+        if self.hybrid:
+            # LanceDB merges the two lists by rank (reciprocal rank fusion), not by score.
+            search = self.table.search(query_type="hybrid").vector(vector).text(query)
+        else:
+            search = self.table.search(vector)
+        return [row["text"] for row in search.distance_type("cosine").limit(k).to_list()]
 
 
 def load_index(
-    doc: str | Path | None = None, embedder: Embedder | None = None, store: str | None = None
+    doc: str | Path | None = None,
+    embedder: Embedder | None = None,
+    store: str | None = None,
+    hybrid: bool = False,
 ) -> Index:
     """The index for `doc`, embedded on first use and reused until the file or model changes."""
     store = store or os.getenv("RAG_STORE") or STORES[0]
     if store not in STORES:
         raise ValueError(f"RAG_STORE must be one of {STORES}, not {store!r}")
-    doc = Path(doc or os.getenv("RAG_DOC") or DEFAULT_DOC)
+    doc = doc_path(doc)
     embedder = embedder or default_embedder()
     stat = doc.stat()
     name = getattr(embedder.model, "model_name", embedder.model)  # model may be a plain string
@@ -87,7 +115,8 @@ def load_index(
     if cache.exists():
         saved = np.load(cache)
         if str(saved["key"]) == key:
-            return _index(doc, saved["chunks"].tolist(), saved["vectors"], embedder, store)
+            chunks = saved["chunks"].tolist()
+            return _index(doc, chunks, saved["vectors"], embedder, store, hybrid)
 
     chunks = loader.chunks(doc)
     if not chunks:
@@ -99,11 +128,18 @@ def load_index(
     print(f"\rEmbedded {len(chunks)} chunks.        ")
     unit = _unit(vectors)
     np.savez(cache, key=key, chunks=np.array(chunks), vectors=unit)
-    return _index(doc, chunks, unit, embedder, store)
+    return _index(doc, chunks, unit, embedder, store, hybrid)
 
 
-def _index(doc: Path, chunks: list[str], vectors: np.ndarray, embedder: Embedder, store: str):
+def _index(
+    doc: Path,
+    chunks: list[str],
+    vectors: np.ndarray,
+    embedder: Embedder,
+    store: str,
+    hybrid: bool,
+):
     table = (
         lance_table(doc.with_suffix(".lancedb"), chunks, vectors) if store == "lancedb" else None
     )
-    return Index(chunks, vectors, embedder, table)
+    return Index(chunks, vectors, embedder, table, hybrid)

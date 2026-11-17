@@ -8,7 +8,7 @@ before handoff (see `AGENTS.md`).
 - Repository root: `gezellig-ai/`
 - Standard startup path: `uv run streamlit run streamlit_app.py` (or `RUN_START_COMMAND=1 ./init.sh`)
 - Standard verification path: `./init.sh` (uv sync, ruff check, ruff format --check, pyright, pytest)
-- Current highest-priority unfinished feature: none recorded; next idea is a RAG eval set + hybrid search (see session 002)
+- Current highest-priority unfinished feature: none recorded; next idea is a RAG eval set (see session 004)
 - Current blocker: none (`./init.sh` passes)
 
 ## Session Log
@@ -77,3 +77,81 @@ before handoff (see `AGENTS.md`).
 - Both this work and the `docs/` notes are on branch `add-lancedb`, in one pull request.
 - Next best step: an eval set of ~10 campaign questions, then hybrid search using LanceDB's
   built-in keyword index.
+
+### Session 003
+
+- Date: 2026-11-11
+- Goal: hybrid (keyword + vector) search in the RAG playground (`rag-003`).
+- Completed: `lance_table` builds a LanceDB keyword index on `text`; `Index(hybrid=True)` runs
+  LanceDB's hybrid query (merged by reciprocal rank fusion); `--hybrid` CLI flag, off by
+  default; startup line names the search type. README, AGENTS.md map row and the wiki updated.
+- Verification run: `./init.sh` exit 0, pytest 112 passed (2 new).
+- Real run: on 14 rare-name questions the name was in the top 5 for 11/14 with vector search
+  and 14/14 with hybrid; common questions unchanged (details in `rag-003` evidence).
+- Known risk or unresolved issue: the eval set was skipped, so "better" is only measured as
+  "the name appears in a retrieved chunk". Hybrid is opt-in until an eval set says otherwise.
+- Branch `rag-hybrid-search`, committed locally, not pushed.
+- Next best step: the eval set of ~10 questions with known answers, then decide whether
+  hybrid becomes the default; after that, reranking.
+
+### Session 003 (continued): reranking notes
+
+- Docs only. `docs/ai-engineering-wiki.md` now explains how hybrid search and reranking work.
+- Decision: reranking is skipped for now. Ollama 0.40.16 has no rerank endpoint (404 on
+  `/api/rerank` and `/v1/rerank`); the local options and their trade-offs are in the wiki.
+- Next best step is unchanged: the eval set, which also tells whether reranking is worth it.
+
+### Session 004
+
+- Date: 2026-11-11
+- Goal: a knowledge graph for the RAG playground (`rag-004`).
+- Completed: `rag_playground/graph.py` (extraction agent, resumable build, JSON cache, lookup
+  by name); `campaign_relations` tool and `graph=` argument on `rag.agentic`; `--graph` CLI
+  flag (needs `--agentic`); `RAG_GRAPH_MODEL` setting; `doc_path` helper in `index.py`.
+  README, AGENTS.md, `.env.example`, wiki section "Knowledge graphs", checklist updated.
+- Verification run: `./init.sh` exit 0, pytest 118 passed (6 new).
+- Real run: graph built in 118 min with `qwen3.6:35b-a3b` (1,251 relations, 23 chunks
+  skipped); the model called `campaign_relations` on connection questions with both
+  `gemma4:e4b` and `qwen3.6:35b-a3b` (details in `rag-004` evidence).
+- Local-only state (git-ignored): `data/rag/setting-the-darkness-ablaze.graph.json`. A fresh
+  clone, a changed document or a changed `RAG_GRAPH_MODEL` means a two-hour rebuild.
+- Known risk or unresolved issue: aliases are not merged, some extracted relations are
+  wrong, skipped chunks are not retried, and nothing was fact-checked by a human.
+- Branch `rag-knowledge-graph`, stacked on `rag-hybrid-search`; committed locally, not pushed.
+- Next best step: the eval set, including two or three connection questions, to measure
+  whether hybrid search and the graph improve answers.
+
+### Session 005
+
+- Date: 2026-11-11
+- Goal: fix the two graph problems found in Session 004: one character under several names,
+  and wrong relations (`rag-005`).
+- Completed (code): the extractor returns the sentence that states each relation; `stated`
+  drops a relation when that sentence or a name is not in the chunk, when an end has no
+  capital letter, or when it names the narrator in text with no first person. The cache key
+  includes the prompt. `draft_aliases` / `load_aliases` write `data/rag/<name>.aliases.json`
+  once (model draft, then hand-edited, never overwritten); `Graph.about` follows the groups
+  and `campaign_relations` shows the quote and the alias names.
+- Verification run: `./init.sh` exit 0, pytest 121 passed (3 new).
+- NOT DONE: the real rebuild, so `rag-005` is `in_progress`. It was started, stopped at 13 of
+  657 chunks, and put on hold at the user's request. Until it runs, `--graph` starts the
+  two-hour build on first use. The old graph is kept as `…graph-v1.json` (git-ignored).
+- Measured so far (details in `rag-005` evidence): in a sample of 49 old relations, 18 were
+  clearly stated relations between named things and 23 were junk or wrong.
+- Known risk: the checks do not judge meaning, so a relation with a real but unrelated quote
+  still passes. The alias draft makes mistakes ("Rayl" grouped with Cevan) and needs review.
+- Next best step: run the rebuild (`uv run rag-playground --agentic --graph`), review the
+  alias file, judge a sample of 50 new relations, then update the wiki with the numbers.
+
+### Session 006
+
+- Date: 2026-11-17
+- Goal: a grep tool for agentic RAG (`rag-006`), next to vector and hybrid search.
+- Completed: `grep_tool` in `rag.py` (case-insensitive regex per paragraph, 200-character
+  snippets, max 30 hits), `--grep` flag (needs `--agentic`), 4 tests, README/AGENTS rows.
+- Verification run: `./init.sh` exit 0, pytest 125 passed. Real-document check and one real
+  question recorded under `rag-006` in `feature_list.json`.
+- Known risk or unresolved issue: grep not yet compared with hybrid on the 14 name questions.
+  `rag-005` graph rebuild still on hold (user's choice, too slow for now).
+- Next best step: a small eval set (questions + expected sections) to compare vector, hybrid
+  and grep fairly.

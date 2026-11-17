@@ -1,6 +1,7 @@
 """The two ways to answer from the campaign: retrieve-then-answer, or let the model search."""
 
 import os
+import re
 from collections.abc import Callable
 
 from pydantic_ai import Agent as PydanticAgent
@@ -9,6 +10,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 
 from ai_playground.agent import DEFAULT_MODEL
 from ai_playground.agent import Agent as PlaygroundAgent
+from rag_playground.graph import Graph
 from rag_playground.index import Index, ollama
 
 RULES = """
@@ -27,6 +29,20 @@ use web search for campaign questions.
 """
     + RULES
 )
+
+GRAPH_CONTEXT = """
+You also have campaign_relations, a lookup of how named characters, places and factions are
+related across the whole story. Use it for questions about connections or overviews, then
+use search_campaign to read the passages before you answer.
+"""
+
+GREP_CONTEXT = """
+You also have grep_campaign, an exact search: it returns every paragraph whose text matches a
+regular expression (case-insensitive). Use it for exact names, words or phrases, and to find
+every mention of something; use search_campaign for questions about meaning.
+"""
+
+MAX_RELATIONS = 60  # an entity like the narrator has hundreds; keep the tool result readable
 
 
 def model_name() -> str:
@@ -63,8 +79,86 @@ def search_tool(index: Index) -> Callable[[str], str]:
     return search_campaign
 
 
-def agentic(index: Index, model: Model | str | None = None) -> PlaygroundAgent:
-    """Agentic RAG: the playground agent, with retrieval as a tool it chooses to call."""
-    return PlaygroundAgent(
-        model or model_name(), extra_context=AGENTIC_CONTEXT, extra_tools=[search_tool(index)]
-    )
+MAX_MATCHES = 30  # a common word matches hundreds of paragraphs; keep the tool result readable
+
+
+CONTEXT_CHARS = 200  # paragraphs run to hundreds of words; show only the text around a match
+
+
+def snippet(line: str, match: re.Match[str]) -> str:
+    """The first match in `line` with up to CONTEXT_CHARS on each side, "..." where cut."""
+    start, end = max(0, match.start() - CONTEXT_CHARS), match.end() + CONTEXT_CHARS
+    return ("..." if start else "") + line[start:end] + ("..." if end < len(line) else "")
+
+
+def grep_tool(chunks: list[str]) -> Callable[[str], str]:
+    def grep_campaign(pattern: str) -> str:
+        """Find every paragraph of the campaign that matches a regular expression.
+
+        Case-insensitive. Each result starts with the chapter or section it comes from,
+        then the text around the first match in that paragraph.
+        Use it for exact names and phrases ("Vecna", "silver (key|door)"), or to list every
+        mention of something across the story.
+        """
+        try:
+            regex = re.compile(pattern, re.IGNORECASE)
+        except re.error as error:
+            return f"Not a valid regular expression: {error}. Fix the pattern and try again."
+        found = [
+            f"{title}: {snippet(line, match)}"
+            for chunk in chunks
+            for title, _, body in [chunk.partition("\n")]
+            for line in body.splitlines()
+            if (match := regex.search(line))
+        ]
+        print(f"  [grep_campaign({pattern!r}) -> {len(found)} paragraphs]")
+        if not found:
+            return f"No paragraph matches {pattern!r}. Try other spellings or search_campaign."
+        if len(found) > MAX_MATCHES:
+            found = found[:MAX_MATCHES] + [f"... and {len(found) - MAX_MATCHES} more"]
+        return "\n\n".join(found)
+
+    return grep_campaign
+
+
+def relations_tool(graph: Graph) -> Callable[[str], str]:
+    def campaign_relations(name: str) -> str:
+        """Look up how one named character, place, faction or item is related to others.
+
+        Returns one line per relation, "A | relation | B (chapter): sentence it comes from",
+        gathered from the whole campaign. Judge each relation by its sentence. Pass a single
+        name, as it is written in the story.
+        """
+        found = graph.about(name)
+        print(f"  [campaign_relations({name!r}) -> {len(found)} relations]")
+        if not found:
+            return f"Nothing in the graph about {name!r}. Try search_campaign."
+        lines = [
+            f"{row['source']} | {row['relation']} | {row['target']} ({row['section']}): "
+            f'"{row["quote"]}"'
+            for row in found[:MAX_RELATIONS]
+        ]
+        if len(found) > MAX_RELATIONS:
+            lines.append(f"... and {len(found) - MAX_RELATIONS} more")
+        if len(same := graph.names(name)) > 1:
+            lines.insert(0, f"These names are the same: {', '.join(same)}.")
+        return "\n".join(lines)
+
+    return campaign_relations
+
+
+def agentic(
+    index: Index,
+    model: Model | str | None = None,
+    graph: Graph | None = None,
+    grep: bool = False,
+) -> PlaygroundAgent:
+    """Agentic RAG: the playground agent, with retrieval as a tool it chooses to call.
+
+    With `graph`, it also gets a tool to look up relations between named things; with `grep`,
+    a regular-expression search over the paragraphs.
+    """
+    tools = [search_tool(index)] + ([relations_tool(graph)] if graph else [])
+    tools += [grep_tool(index.chunks)] if grep else []
+    context = AGENTIC_CONTEXT + (GRAPH_CONTEXT if graph else "") + (GREP_CONTEXT if grep else "")
+    return PlaygroundAgent(model or model_name(), extra_context=context, extra_tools=tools)
