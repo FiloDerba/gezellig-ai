@@ -66,7 +66,7 @@ Python 3.14, managed with `uv` (one `pyproject.toml`, one `uv.lock`, one `.venv`
 | Area | Path | What it is | Entry point |
 |---|---|---|---|
 | AI playground | `src/ai_playground/` | pydantic-ai chat agent (local Ollama by default) with `date` + Tavily `web_search` tools. Accepts `extra_context` / `extra_tools` so hosts can extend it. | `uv run gezellig-ai` |
-| RAG playground | `src/rag_playground/` | Two-step and agentic RAG over a local document (git-ignored `data/rag/`), embedded with a local Ollama model and searched in LanceDB (numpy fallback: `RAG_STORE=numpy`; `--hybrid` adds keyword search; `--graph` adds a knowledge graph lookup tool to agentic mode; `--grep` adds a regex search tool). | `uv run rag-playground [--agentic] [--hybrid] [--graph] [--grep]`, `uv run rag-eval` |
+| RAG playground | `src/rag_playground/` | Two-step and agentic RAG over a local document (git-ignored `data/rag/`), embedded with a local Ollama model and searched in LanceDB (numpy fallback: `RAG_STORE=numpy`; `--hybrid` adds keyword search; `--graph` adds a knowledge graph lookup tool to agentic mode; `--grep` adds a regex search tool; `rag-eval` scores retrieval; `rag-mcp` serves the search tools over MCP). | `uv run rag-playground [--agentic] [--hybrid] [--graph] [--grep]`, `uv run rag-eval`, `uv run rag-mcp` |
 | Dutch trainer UI | `src/dutch_learning/` | Streamlit app: spaced-repetition study, AI coach, pronunciation scoring (Gemini), assistant page. No business logic here. | `uv run streamlit run streamlit_app.py` |
 | Dutch trainer backend | `django/` | Django used **as a library** (ORM + admin), not a server. `vocabulary/` holds models, SM-2 (`srs.py`), reads (`selectors.py`), writes (`services.py`), Anki import. | `django/manage.py` |
 | Tests | `tests/` (app/agent), `django/**/test_*.py` | pytest | `uv run pytest` |
@@ -77,6 +77,7 @@ Seams between areas:
   about Dutch.
 - `rag_playground` -> `ai_playground`: agentic mode passes a `search_campaign` tool through
   the same `extra_context`/`extra_tools` seam (`rag_playground/rag.py`).
+- Both hosts also import `ai_playground.agent.token_usage(messages)` to print token use.
 - `dutch_learning` -> `django`: `django_bootstrap.py` configures Django in-process;
   `data.py` is the only adapter the pages use.
 

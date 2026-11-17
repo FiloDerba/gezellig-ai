@@ -1,10 +1,18 @@
 # gezellig-ai
 
-A Dutch spaced-repetition trainer with AI coaching and pronunciation scoring, built on top of
-a [pydantic-ai](https://ai.pydantic.dev) playground.
+My playground for learning to build with LLMs. It holds a few separate experiments:
 
-*Gezellig* is the Dutch word for the warm, sociable feeling that has no English equivalent —
-the first thing anyone learning Dutch is told is untranslatable.
+| Folder | What it is |
+|---|---|
+| `src/ai_playground/` | A small chat agent (pydantic-ai, local Ollama) with date and web search tools |
+| `src/rag_playground/` | Question answering over a long document: vector, keyword and grep search, a knowledge graph, an eval, and an MCP server |
+| `src/dutch_learning/` + `django/` | A Dutch vocabulary trainer with spaced repetition and AI coaching |
+
+What I learned along the way is in [`docs/ai-engineering-wiki.md`](docs/ai-engineering-wiki.md),
+and what's left to learn is in [`docs/ai-learning-checklist.md`](docs/ai-learning-checklist.md).
+
+*Gezellig* is the Dutch word for a warm, cosy, sociable feeling. Every Dutch course tells you
+it can't be translated.
 
 ## Setup
 
@@ -14,15 +22,17 @@ cp .env.example .env
 ollama pull qwen3.6:35b-a3b
 ```
 
-The playground uses Ollama at `http://localhost:11434/v1` by default. Set `PLAYGROUND_MODEL`
-to the name of a model you have installed in Ollama, or set `OLLAMA_BASE_URL` for a different
-local endpoint. `TAVILY_API_KEY` enables web search. The Dutch learning app's tutor and
-pronunciation features still use Gemini and need `GOOGLE_API_KEY`.
+Everything runs on Ollama at `http://localhost:11434/v1` unless you say otherwise. The
+settings in `.env`:
 
-## Run
+- `PLAYGROUND_MODEL`: any model you have pulled in Ollama
+- `OLLAMA_BASE_URL`: if Ollama runs somewhere else
+- `TAVILY_API_KEY`: turns on web search
+- `GOOGLE_API_KEY`: the Dutch trainer's coach and pronunciation features use Gemini
 
-Starts an interactive chat loop backed by your local Ollama model, with `date` and
-`web_search` (Tavily) tools wired in.
+## AI playground
+
+A chat loop with your local model, which can look up the date and search the web.
 
 ```bash
 uv run gezellig-ai
@@ -30,157 +40,142 @@ uv run gezellig-ai
 
 ## RAG playground
 
-Ask questions about a long local document, here a D&D campaign summary, with everything
-running on Ollama. Put the `.docx` in the git-ignored `data/rag/` folder (see `RAG_DOC`).
+Ask questions about a long document; mine is a 160k-word D&D campaign. Everything runs
+locally. Put the `.docx` in `data/rag/` (git-ignored) and point `RAG_DOC` at it.
 
 ```bash
 ollama pull bge-m3
-uv run rag-playground             # two-step: always retrieve 5 chunks, then answer
-uv run rag-playground --agentic   # the model calls search_campaign when and as often as it wants
-uv run rag-playground --hybrid    # search by keyword as well as by vector (works with --agentic)
-uv run rag-playground --agentic --graph   # also give the model a knowledge graph lookup
-uv run rag-playground --agentic --grep    # also give the model a regular-expression search
-uv run rag-eval                           # score vector, hybrid and grep retrieval on an eval set
+uv run rag-playground                    # retrieve 5 passages, then answer
+uv run rag-playground --agentic          # the model searches when and as often as it wants
+uv run rag-playground --hybrid           # keyword search too (works with --agentic)
+uv run rag-playground --agentic --grep   # add an exact regex search tool
+uv run rag-playground --agentic --graph  # add a knowledge graph lookup tool
+uv run rag-eval                          # score each search mode on a set of questions
+uv run rag-mcp                           # serve the search tools over MCP
 ```
 
-The document is split on its heading styles and packed into ~300-word chunks that start with
-their chapter title. The first run embeds them (a minute or two) into
-`data/rag/<name>.index.npz`; later runs reuse that until the file or `RAG_EMBED_MODEL` changes.
-Search is cosine similarity over all chunks, run in a [LanceDB](https://lancedb.com) table
-(`data/rag/<name>.lancedb`, rebuilt from the `.npz` at each start). Set `RAG_STORE=numpy` to
-skip the database and search the same vectors directly in numpy; both return the same chunks,
-and the startup line says which one is in use. `--hybrid` adds LanceDB's keyword (BM25)
-search and merges it with the vector results, which finds rare invented names that the
-embedding model misses; it needs the LanceDB store. `--graph` (with `--agentic`) has a
-local chat model (`RAG_GRAPH_MODEL`) read every chunk once and write down the relations
-between named things into `data/rag/<name>.graph.json`, about two hours for this campaign;
-an interrupted build continues where it stopped. A relation is kept only when its chunk
-contains the sentence the model quotes for it and both names. The model also drafts
-`data/rag/<name>.aliases.json`, groups of names that mean the same thing ("Cevan",
-"Vecna"); review and edit that file, it is never overwritten. The chat model then gets a
-`campaign_relations` tool to look a name up under all its aliases. `--grep` (with `--agentic`)
-gives the model `grep_campaign`, an exact, case-insensitive regex search over the paragraphs
-with no index: each hit is the section title and the text around the match, at most 30.
-`rag-eval` reads `data/rag/<name>.eval.json` (questions, the sections that answer them, and
-a regex for grep; format in `src/rag_playground/evaluate.py`) and prints, per search mode,
-how many questions got an answering section back, words returned and time per question. Both modes print which chapters were retrieved, so you
-can see why an answer came out the way it did. Two-step answers each question on its own;
-agentic keeps the conversation. `loader.py` knows this document's heading style names
-(`SamKop`, `Samkop2`); change them there for another document.
+### How it works
 
-## Dutch learning app
+- The document is split at its headings into passages of about 300 words, each starting
+  with its chapter title. `loader.py` knows this document's heading styles (`SamKop`,
+  `Samkop2`); change them there for another document.
+- The first run embeds the passages, which takes a minute or two. Later runs reuse them
+  until the document or `RAG_EMBED_MODEL` changes.
+- Search runs in [LanceDB](https://lancedb.com). `RAG_STORE=numpy` does the same search in
+  plain numpy instead, with the same results.
+- Each answer shows which chapters were retrieved and how many tokens it used.
+- The default mode answers every question on its own. `--agentic` keeps the conversation.
 
-A spaced-repetition vocabulary trainer with AI coaching and pronunciation scoring.
+### The options
+
+- **`--hybrid`** runs a keyword (BM25) search next to the vector search and merges the two.
+  It finds invented names that the embedding model misses. Needs LanceDB.
+- **`--grep`** gives the model a case-insensitive regex search over every paragraph. No
+  index needed. It returns up to 30 hits, each with the text around the match.
+- **`--graph`** has a local model (`RAG_GRAPH_MODEL`) read every passage once and note how
+  the named characters, places and factions relate. That takes about two hours for this
+  campaign, and it picks up where it stopped if interrupted. A relation is only kept if its
+  passage contains both names and the sentence the model quotes. The model also drafts a
+  list of names that mean the same person ("Cevan" and "Vecna"). Check that list and edit
+  it; it is never overwritten.
+- **`rag-eval`** reads a list of questions with the sections that answer them, and shows
+  for each search mode how many it found, how much text it returned and how long it took.
+  The file format is described at the top of `src/rag_playground/evaluate.py`.
+- **`rag-mcp`** offers `search_campaign` and `grep_campaign` to any MCP client. For Claude
+  Code: `claude mcp add campaign -- uv run --project /path/to/gezellig-ai rag-mcp --hybrid`.
+
+Everything it creates lives next to the document in `data/rag/`:
+
+| File | What it is |
+|---|---|
+| `<name>.index.npz` | The embedded passages |
+| `<name>.lancedb` | The search table, rebuilt from the `.npz` on every start |
+| `<name>.graph.json` | The knowledge graph |
+| `<name>.aliases.json` | Names that mean the same thing; edit by hand |
+| `<name>.eval.json` | Your eval questions |
+
+## Dutch trainer
+
+A vocabulary trainer: spaced repetition, an AI coach, and pronunciation scoring.
 
 ```bash
 uv run streamlit run streamlit_app.py
 ```
 
-That is the whole thing — one process, no server. The app configures Django inside itself and
-uses the ORM to reach the database named in `django/.env`, so Django is a library here rather
-than a service. Run it from the repo root so `.streamlit/config.toml` (dark theme, orange
-accent) and `data/media` (the deck's audio) resolve.
-
-### Pages
+There is no server. The app sets up Django inside itself and uses it only for the database,
+so Django works as a library here. Run it from the repo root so it finds
+`.streamlit/config.toml` and the audio in `data/media`.
 
 | Page | What it does |
 |---|---|
-| Study | Today's session. Flip, rate, and get intervals previewed on each answer button |
-| Speaking | Say the word, record it, and have Gemini score the pronunciation |
-| Assistant | The playground agent, able to search the words you have actually studied |
-| Progress | Review activity, upcoming load, maturity split, per-chapter breakdown |
-| Words | Filter and search the whole deck |
-| Manage | Load the sample deck, add words, see how to import Anki |
+| Study | Today's cards. Flip, rate, and see the next interval on each button |
+| Speaking | Record yourself saying the word; Gemini scores the pronunciation |
+| Assistant | The playground agent, able to search the words you've studied |
+| Progress | Reviews over time, upcoming load, and progress per chapter |
+| Words | Search and filter the whole deck |
+| Manage | Load the sample deck, add words, import from Anki |
 
-Sessions are capped by **Cards per day** under *Session*, so a 3000-word deck stays finite.
+**Cards per day** (under *Session*) caps each session, so a 3,000-word deck stays manageable.
 
-### AI
+### AI features
 
-`GOOGLE_API_KEY` in the root `.env` powers three things, all of which degrade to a caption if
-the key is missing:
+They need `GOOGLE_API_KEY`; without it they show a note instead. `DUTCH_MODEL` picks the
+model.
 
-- **Coach** on the Study page returns a structured breakdown — meaning, an example sentence
-  with translation, a mnemonic, and the mistake English speakers make with that word.
-- **Ask** takes a free-form question about the current card and deliberately withholds the
-  translation, since you are mid-recall.
-- **Speaking** sends your recording to Gemini and gets back a score, what it heard, and
-  concrete fixes, tuned for the sounds English speakers find hard in Dutch (`g`/`ch`, `ui`,
-  `eu`, `ij`/`ei`, dropped final `n`).
+- **Coach** (Study page): the meaning, an example sentence, a memory trick, and the mistake
+  English speakers usually make with the word.
+- **Ask** (Study page): ask anything about the current card. It won't give away the
+  translation, since you're trying to remember it.
+- **Speaking**: a score, what it heard, and what to fix, with attention to the sounds English
+  speakers find hard (`g`/`ch`, `ui`, `eu`, `ij`/`ei`, the dropped final `n`).
+- **Assistant**: the same agent as `uv run gezellig-ai`, plus two tools that read your deck:
+  `search_my_vocabulary(query)` and `my_vocabulary_summary()`. It looks words up per
+  question instead of getting the whole deck in its prompt, which would be 60-100k tokens
+  every message. "Studied" means the word appears in your review history, so words you
+  rated *Again* still count.
 
-Override the model with `DUTCH_MODEL`.
-
-### Assistant
-
-The **Assistant** page runs the `ai_playground` agent — the same one behind `uv run
-gezellig-ai`, keeping its date and web search tools — with two extra tools that read this
-deck, so answers are grounded in your own vocabulary instead of Dutch in general:
-
-| Tool | Returns |
-|---|---|
-| `search_my_vocabulary(query)` | Studied words matching a Dutch or English substring, with review counts and recency |
-| `my_vocabulary_summary()` | Coverage, maturity split, streak, and chapters touched |
-
-"Studied" means *appears in the review log*, not `reps > 0`. An `Again` rating resets `reps`
-to zero, so the simpler definition would hide exactly the words you found hardest.
-
-Retrieval happens per turn through tools rather than by pasting the deck into the prompt,
-which keeps each turn cheap and always current — the full deck would be roughly 60-100k tokens
-every message. The agent is cached on the model alone, so it can never hold a stale copy.
-Expect tool-using turns to take noticeably longer than plain ones, since they are two model
-round trips plus a database query.
-
-`ai_playground.Agent` gained `extra_context` and `extra_tools` for this, so the host
-application injects its own knowledge without the agent package knowing anything about Dutch.
-Set `PLAYGROUND_MODEL` to change its model.
-
-### Layout
+### Where things live
 
 ```
-streamlit_app.py             navigation only
+streamlit_app.py             page navigation
 src/dutch_learning/
     data.py                  everything the pages read and write
-    ai.py                    agents and their structured outputs
-    shared.py                cached agents, session handling, formatters
-    django_bootstrap.py      configures Django in-process
-    app_pages/               one script per page
+    ai.py                    the AI agents and their output formats
+    shared.py                cached agents and session helpers
+    django_bootstrap.py      sets up Django inside the app
+    app_pages/               one file per page
 django/
-    backend/                 settings, admin urls
-    vocabulary/              models, migrations, selectors, services, SM-2, admin
+    backend/                 settings, admin
+    vocabulary/              models, scheduling (srs.py), reads (selectors.py), writes (services.py)
 ```
 
-Scheduling rules and queries live on the Django side: `vocabulary/srs.py` holds the
-Anki-flavoured SM-2, `selectors.py` the reads, `services.py` the writes. `data.py` only adapts
-them for the UI, so no business logic sits in the Streamlit layer.
+The pages hold no logic of their own; scheduling and queries live in `django/vocabulary/`.
 
 ### Database
 
-Defaults to `django/db.sqlite3`. Set `DATABASE_URL` in `django/.env` to use hosted Postgres —
-[Neon](https://neon.com) is a good fit because its free tier does not pause idle projects,
-unlike [Supabase](https://supabase.com).
+SQLite by default (`django/db.sqlite3`). To use hosted Postgres, set `DATABASE_URL` in
+`django/.env`. [Neon](https://neon.com) works well: its free tier doesn't pause idle projects.
 
 1. Create a project at [console.neon.tech](https://console.neon.tech).
-2. Copy the connection string from **Connect**, keeping the
-   `?sslmode=require&channel_binding=require` suffix; both are forwarded to the driver.
-3. Put it in `django/.env` (gitignored), then create the schema:
+2. Copy the connection string from **Connect**, including the
+   `?sslmode=require&channel_binding=require` part.
+3. Put it in `django/.env` and create the tables:
 
 ```bash
 cd django
 uv run --project .. python manage.py migrate
 ```
 
-To carry an existing deck across, dump it while still on SQLite and load it once `DATABASE_URL`
-points at Neon. `loaddata` resets the Postgres sequences, so new words still get usable ids:
+To move an existing deck over, export it while still on SQLite, then load it into Postgres:
 
 ```bash
 uv run --project .. python manage.py dumpdata vocabulary --indent 2 -o ../data/deck.json
 uv run --project .. python manage.py loaddata ../data/deck.json
 ```
 
-Expect a remote database to feel slower than SQLite; `CONN_MAX_AGE` is 600s so connections are
-reused rather than redialled. Blank values in `.env` are treated as unset, so the defaults still
-apply. The test suite always uses SQLite, whatever `DATABASE_URL` says.
+A remote database feels slower than SQLite. Tests always use SQLite.
 
-### Getting words in
+### Importing words
 
 ```bash
 cd django
@@ -188,46 +183,30 @@ uv run --project .. python manage.py import_anki /path/to/deck.apkg
 uv run --project .. python manage.py import_legacy ../data/dutch_learning.db
 ```
 
-Anki audio lands in `data/media` and is what the Speaking page plays as the native reference.
+Anki audio goes to `data/media` and is what the Speaking page plays as the native example.
 
 ### Admin
 
-The only reason to run a server. Useful for bulk edits and for inspecting schedules:
+For bulk edits and checking schedules. This is the only time you run a server:
 
 ```bash
 cd django
-uv run --project .. python manage.py runserver     # http://127.0.0.1:8000/admin/
+uv run --project .. python manage.py createsuperuser   # once
+uv run --project .. python manage.py runserver         # http://127.0.0.1:8000/admin/
 ```
 
-Create a login with `manage.py createsuperuser`. Words list with their schedule, filter by
-chapter and word type, and can be bulk-reset; the review log is read-only, since those rows are
-written by the study flow.
-
-## Dev
+## Development
 
 ```bash
+./init.sh                         # everything CI runs: sync, lint, format check, types, tests
 uv run pytest
-uv run ruff check .
-uv run ruff format .
+uv run ruff check . && uv run ruff format .
 uv run pyright
+uv run pre-commit install         # once per clone
 ```
 
-### Pre-commit
+The pre-commit hooks run ruff, catch the usual mistakes (whitespace, merge conflicts, large
+files, private keys) and check that `uv.lock` matches `pyproject.toml`. They only see files
+git knows about, so stage a new file before running them on it.
 
-```bash
-uv run pre-commit install        # once per clone
-uv run pre-commit run --all-files
-```
-
-Hooks: the standard hygiene set (trailing whitespace, end-of-file, merge conflicts, large
-files, private keys, JSON/TOML/YAML validity), then `ruff check --fix`, `ruff format`, and
-`uv lock --check` so `pyproject.toml` and `uv.lock` cannot drift apart.
-
-This follows the same shape as the hook set in `nordics-forecasting`, but runs ruff instead of
-black + flake8 + isort. Ruff already covers all three roles here, and running both stacks would
-have them fighting over the same files — notably line length, which is 100 in this repo against
-120 there. Hook settings are read from `pyproject.toml`, so `uv run ruff ...` and the hooks can
-never disagree.
-
-Note `pre-commit run --all-files` only sees files git tracks, so a brand-new file is skipped
-until it is at least staged.
+`main` only takes pull requests that pass CI.

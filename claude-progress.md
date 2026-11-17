@@ -8,7 +8,7 @@ before handoff (see `AGENTS.md`).
 - Repository root: `gezellig-ai/`
 - Standard startup path: `uv run streamlit run streamlit_app.py` (or `RUN_START_COMMAND=1 ./init.sh`)
 - Standard verification path: `./init.sh` (uv sync, ruff check, ruff format --check, pyright, pytest)
-- Current highest-priority unfinished feature: none recorded; next idea is a RAG eval set (see session 004)
+- Current highest-priority unfinished feature: `rag-005` (graph rebuild on hold by the user); next new work is `rag-008`, a reranker, after the eval gets harder questions
 - Current blocker: none (`./init.sh` passes)
 
 ## Session Log
@@ -157,5 +157,13 @@ before handoff (see `AGENTS.md`).
   `rag-007` retrieval eval, `uv run rag-eval`, 16 questions in git-ignored
   `data/rag/<name>.eval.json`. vector 15/16, hybrid 16/16, grep 15/16 (numbers under
   `rag-007`). Checklist and wiki "Next experiments" updated.
+- Then, at the user's request: `obs-001` token use printed per turn (CLIs, two-step, Assistant
+  page); `mcp-001` `rag-mcp` server (adds `pydantic-ai-slim[mcp]`, mcp 2.3); wiki sections on
+  context engineering, evals and MCP; README rewritten in plainer language; checklist ticked.
+- Verification run: `./init.sh` exit 0 after each feature, last run 128 passed. One slip: the
+  MCP commit was first made with 7 pyright errors (my command did not stop on init.sh's exit
+  code); fixed and amended before anything was pushed.
+- Not done: Claude Code as an MCP client (needs `claude mcp add`, a change to the user's
+  config); the Streamlit Assistant page was not opened in a browser after the token label.
 - Next best step: user reviews the eval questions and adds harder ones (multi-chapter,
   paraphrased); then `rag-008`, a reranker behind `--rerank`, kept only if the eval improves.
