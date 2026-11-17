@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 def main() -> None:
     load_dotenv()
+    from ai_playground.agent import token_usage
     from rag_playground import rag
     from rag_playground.graph import load_graph
     from rag_playground.index import load_index
@@ -34,7 +35,15 @@ def main() -> None:
         query = input("You: ")
         if query.lower() in ("exit", "quit"):
             break
-        print(f"Assistant: {agent.chat(query) if agent else rag.two_step(index, query)}")
+        if not agent:
+            print(f"Assistant: {rag.two_step(index, query)}")
+            continue
+        before = len(agent.messages)
+        print(f"Assistant: {agent.chat(query)}")
+        print(
+            f"  [tokens: {token_usage(agent.messages[before:])}; conversation: "
+            f"{token_usage(agent.messages)}]"
+        )
 
 
 if __name__ == "__main__":

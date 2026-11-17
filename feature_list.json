@@ -176,6 +176,23 @@
         "2026-11-17: first run crashed: a second load_index rebuilt the LanceDB table under the first index. Fixed by loading once and building the vector-only Index on the same table."
       ],
       "notes": "The user has not reviewed the questions yet. Too easy to rank modes: 1 question apart is noise. It measures retrieval only (any answering section in the results), not rank or answer quality. Grep gets a hand-written pattern, an upper bound on what a model would write. Grep returns up to 30 snippets, vector/hybrid 5 chunks, so compare words too."
+    },
+    {
+      "id": "obs-001",
+      "priority": 10,
+      "area": "ai_playground",
+      "title": "Token usage per turn",
+      "user_visible_behavior": "After every answer, gezellig-ai and rag-playground --agentic print the turn's requests and input/output tokens plus the conversation total; two-step RAG prints its one request; the Streamlit Assistant shows the turn's tokens in the 'Thought for' label. One helper, ai_playground.agent.token_usage(messages), sums the usage each model response carries, so it keeps no state and is safe for the agent shared between Streamlit sessions.",
+      "status": "passing",
+      "verification": [
+        "Run ./init.sh.",
+        "Ask real questions in agentic and two-step mode and read the token lines."
+      ],
+      "evidence": [
+        "2026-11-17: ./init.sh exit 0; new test sums a two-request run (103 in, 14 out with TestModel).",
+        "2026-11-17: Ollama, default model, agentic: 'Who is Garrick?' 2 requests, 2,586 in, 485 out (one search). Follow-up with no search: 1 request, 2,275 in, because the history, retrieved passages included, is resent. Two-step 'Who is Garrick?': 1 request, 1,788 in, 579 out."
+      ],
+      "notes": "Printed, not stored. No cost: local models are free and the provider-qualified ones are rarely used. Streamlit page not opened in a browser for this change."
     }
   ]
 }

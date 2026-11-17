@@ -3,6 +3,7 @@ import time
 import streamlit as st
 from pydantic_ai.messages import ToolCallPart
 
+from ai_playground.agent import token_usage
 from dutch_learning import data, shared
 
 SUGGESTIONS = {
@@ -77,7 +78,8 @@ with st.chat_message("assistant"):
                 st.caption("Tool call")
 
         elapsed = time.monotonic() - started
-        status.update(label=f"Thought for {elapsed:.0f}s", state="complete")
+        label = f"Thought for {elapsed:.0f}s · {token_usage(new_messages)} tokens"
+        status.update(label=label, state="complete")
 
     st.markdown(reply)
 

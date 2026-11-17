@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 
-from ai_playground.agent import Agent
+from ai_playground.agent import Agent, token_usage
 
 load_dotenv()
 
@@ -13,8 +13,12 @@ def main() -> None:
         if query.lower() in ("exit", "quit"):
             break
 
-        response = agent.chat(query)
-        print(f"Assistant: {response}")
+        before = len(agent.messages)
+        print(f"Assistant: {agent.chat(query)}")
+        print(
+            f"  [tokens: {token_usage(agent.messages[before:])}; conversation: "
+            f"{token_usage(agent.messages)}]"
+        )
 
 
 if __name__ == "__main__":

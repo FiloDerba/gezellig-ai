@@ -8,7 +8,7 @@ from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai.models import Model
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from ai_playground.agent import DEFAULT_MODEL
+from ai_playground.agent import DEFAULT_MODEL, token_usage
 from ai_playground.agent import Agent as PlaygroundAgent
 from rag_playground.graph import Graph
 from rag_playground.index import Index, ollama
@@ -61,7 +61,9 @@ def two_step(index: Index, question: str, model: Model | str | None = None, k: i
     model = model or OpenAIChatModel(model_name(), provider=ollama())
     agent = PydanticAgent(model, system_prompt="You answer questions about a D&D campaign." + RULES)
     excerpts = "\n\n---\n\n".join(found)
-    return agent.run_sync(f"Excerpts:\n\n{excerpts}\n\nQuestion: {question}").output
+    result = agent.run_sync(f"Excerpts:\n\n{excerpts}\n\nQuestion: {question}")
+    print(f"  [tokens: {token_usage(result.new_messages())}]")
+    return result.output
 
 
 def search_tool(index: Index) -> Callable[[str], str]:

@@ -4,6 +4,7 @@ from pydantic_ai.models import Model
 from pydantic_ai.models.test import TestModel
 
 from ai_playground.agent import Agent as PlaygroundAgent
+from ai_playground.agent import token_usage
 from ai_playground.prompts import goal, instructions, knowledge, role
 
 
@@ -118,3 +119,12 @@ class StatefulChatTests:
         agent.chat("hallo")
         assert agent.clear_chat() is True
         assert agent.messages == []
+
+
+def test_token_usage_adds_up_every_model_response():
+    def echo(text: str) -> str:
+        return text
+
+    result = Agent(TestModel(), tools=[echo]).run_sync("hi")  # a tool call, then the answer
+    assert token_usage(result.new_messages()) == "2 requests, 103 in, 14 out"
+    assert token_usage([]) == "0 requests, 0 in, 0 out"
