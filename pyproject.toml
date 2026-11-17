@@ -24,6 +24,7 @@ dependencies = [
 [project.scripts]
 gezellig-ai = "ai_playground:main"
 rag-playground = "rag_playground:main"
+rag-eval = "rag_playground.evaluate:main"
 
 [build-system]
 requires = ["uv_build>=0.9.17,<0.10.0"]

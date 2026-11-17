@@ -91,6 +91,18 @@ def snippet(line: str, match: re.Match[str]) -> str:
     return ("..." if start else "") + line[start:end] + ("..." if end < len(line) else "")
 
 
+def grep(chunks: list[str], pattern: str) -> list[tuple[str, str]]:
+    """(section title, text around the first match) for every paragraph matching `pattern`."""
+    regex = re.compile(pattern, re.IGNORECASE)
+    return [
+        (title, snippet(line, match))
+        for chunk in chunks
+        for title, _, body in [chunk.partition("\n")]
+        for line in body.splitlines()
+        if (match := regex.search(line))
+    ]
+
+
 def grep_tool(chunks: list[str]) -> Callable[[str], str]:
     def grep_campaign(pattern: str) -> str:
         """Find every paragraph of the campaign that matches a regular expression.
@@ -101,16 +113,9 @@ def grep_tool(chunks: list[str]) -> Callable[[str], str]:
         mention of something across the story.
         """
         try:
-            regex = re.compile(pattern, re.IGNORECASE)
+            found = [f"{title}: {text}" for title, text in grep(chunks, pattern)]
         except re.error as error:
             return f"Not a valid regular expression: {error}. Fix the pattern and try again."
-        found = [
-            f"{title}: {snippet(line, match)}"
-            for chunk in chunks
-            for title, _, body in [chunk.partition("\n")]
-            for line in body.splitlines()
-            if (match := regex.search(line))
-        ]
         print(f"  [grep_campaign({pattern!r}) -> {len(found)} paragraphs]")
         if not found:
             return f"No paragraph matches {pattern!r}. Try other spellings or search_campaign."

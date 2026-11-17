@@ -158,6 +158,24 @@
         "2026-11-17: gemma4:e2b, 'Which chapters mention the Silver Hand, and what is it?': search_campaign returned 5 story chapters and missed the Factions of Aeloria section; grep_campaign('Silver Hand') found its 2 paragraphs and the answer came from them."
       ],
       "notes": "Added next to search_campaign, not instead of it, so the model picks. Not measured: the 14 name questions used for --hybrid, or grep alone versus hybrid. Only the first match per paragraph is shown."
+    },
+    {
+      "id": "rag-007",
+      "priority": 9,
+      "area": "rag_playground",
+      "title": "RAG playground: retrieval eval set (rag-eval)",
+      "user_visible_behavior": "`uv run rag-eval` reads data/rag/<name>.eval.json (git-ignored: question, kind, grep pattern, sections that answer it) and prints for vector, hybrid and grep: questions where an answering section came back, average words returned, ms per question, and each missed question.",
+      "status": "passing",
+      "verification": [
+        "Run ./init.sh.",
+        "Run uv run rag-eval on the real document and record the table."
+      ],
+      "evidence": [
+        "2026-11-17: ./init.sh exit 0; new test for score/by_grep/by_index on a fake index.",
+        "2026-11-17: 16 questions drafted by Claude from the document (8 name, 3 world-building, 5 paraphrased), answer sections from reading the passages. vector 15/16, 1,248 words, 30.5 ms (missed 'Who is Elara?'); hybrid 16/16, 1,212 words, 17.4 ms; grep 15/16, 561 words, 5.9 ms (missed 'Why were the adventurers invited to Ksenrae?': chapter 4 says 'invitation' only in its title, which grep does not search).",
+        "2026-11-17: first run crashed: a second load_index rebuilt the LanceDB table under the first index. Fixed by loading once and building the vector-only Index on the same table."
+      ],
+      "notes": "The user has not reviewed the questions yet. Too easy to rank modes: 1 question apart is noise. It measures retrieval only (any answering section in the results), not rank or answer quality. Grep gets a hand-written pattern, an upper bound on what a model would write. Grep returns up to 30 snippets, vector/hybrid 5 chunks, so compare words too."
     }
   ]
 }

@@ -153,5 +153,9 @@ before handoff (see `AGENTS.md`).
   question recorded under `rag-006` in `feature_list.json`.
 - Known risk or unresolved issue: grep not yet compared with hybrid on the 14 name questions.
   `rag-005` graph rebuild still on hold (user's choice, too slow for now).
-- Next best step: a small eval set (questions + expected sections) to compare vector, hybrid
-  and grep fairly.
+- Then (plan approved by the user: eval, reranker, MCP, context-engineering write-up):
+  `rag-007` retrieval eval, `uv run rag-eval`, 16 questions in git-ignored
+  `data/rag/<name>.eval.json`. vector 15/16, hybrid 16/16, grep 15/16 (numbers under
+  `rag-007`). Checklist and wiki "Next experiments" updated.
+- Next best step: user reviews the eval questions and adds harder ones (multi-chapter,
+  paraphrased); then `rag-008`, a reranker behind `--rerank`, kept only if the eval improves.

@@ -548,10 +548,10 @@ Useful commands: `ollama list` (installed), `ollama ps` (loaded right now),
 
 ## Next experiments
 
-1. Write about 10 campaign questions with known answers, as an eval set. Without it,
-   "better" is a guess.
-2. Add hybrid (keyword + vector) search with LanceDB's keyword index and check it on
-   invented names.
+1. ~~Write about 10 campaign questions with known answers, as an eval set.~~ Done:
+   `rag-eval`, 16 questions. Next: harder questions, since every mode scores 15 or 16.
+2. ~~Add hybrid (keyword + vector) search and check it on invented names.~~ Done, plus a
+   grep tool for agentic mode.
 3. Add chunk overlap and see whether "ends mid-scene" answers go away.
 4. Try a reranker.
 5. Prompt the small model to search more than once on multi-part questions.

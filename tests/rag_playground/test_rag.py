@@ -6,7 +6,7 @@ from pydantic_ai import Embedder, UnexpectedModelBehavior
 from pydantic_ai.embeddings import TestEmbeddingModel
 from pydantic_ai.models.test import TestModel
 
-from rag_playground import graph, loader, rag
+from rag_playground import evaluate, graph, loader, rag
 from rag_playground.graph import Graph, Relation, load_graph
 from rag_playground.index import Index, lance_table, load_index, top_k
 
@@ -149,6 +149,18 @@ def test_agentic_agent_with_grep_can_call_it(capsys):
     output, _ = rag.agentic(fake_index(), model, grep=True).run("Where is the swamp?")
     assert output
     assert "grep_campaign('a') -> 1 paragraphs" in capsys.readouterr().out
+
+
+def test_score_counts_a_hit_when_a_result_is_in_an_expected_section():
+    questions = [
+        {"kind": "name", "question": "Q1", "pattern": "swamp", "sections": ["Chapter 1:"]},
+        {"kind": "name", "question": "Q2", "pattern": "nothing", "sections": ["Chapter 2:"]},
+    ]
+    missed, words, _ = evaluate.score(questions, evaluate.by_grep(fake_index().chunks))
+    assert [q["question"] for q in missed] == ["Q2"]
+    assert words == 9 / 2  # "Chapter 1: A temple: The swamp smelled of decay." for Q1 only
+    missed, _, _ = evaluate.score(questions, evaluate.by_index(fake_index()))
+    assert [q["question"] for q in missed] == ["Q2"]
 
 
 NERWEN = Relation(

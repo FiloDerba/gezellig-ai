@@ -24,7 +24,7 @@ anything you want to revisit.
 ## Stage 2: Core building blocks
 
 - [x] Build with tool calling → [wiki](ai-engineering-wiki.md#tool-calling)
-- [ ] Learn RAG → [wiki](ai-engineering-wiki.md#rag)
+- [x] Learn RAG → [wiki](ai-engineering-wiki.md#rag)
   - [x] Standard RAG: retrieve relevant info and pass it to the prompt
   - [x] Agentic RAG: retrieve through a tool
   - [x] Knowledge graph → [wiki](ai-engineering-wiki.md#knowledge-graphs)
@@ -39,6 +39,9 @@ anything you want to revisit.
 - [x] RAG vs fine-tuning → [wiki](ai-engineering-wiki.md#rag-vs-fine-tuning)
 - [ ] Hybrid search and reranking
       → [wiki](ai-engineering-wiki.md#hybrid-search-and-reranking)
+  - [x] Hybrid (keyword + vector) search
+  - [x] Grep: exact regex search as an agent tool, no index *(added)*
+  - [ ] Reranking
 - [ ] Context engineering: deciding what goes into the prompt and what stays out *(added)*
 - [ ] MCP (Model Context Protocol): the standard way to expose tools to agents *(added)*
 
@@ -59,6 +62,7 @@ anything you want to revisit.
 - [ ] Add auth
 - [ ] Add observability
 - [ ] Add evals
+  - [x] Retrieval eval: does each search return the section that answers? (`rag-eval`)
 - [ ] Break it with real failures
 - [ ] Defend against prompt injection (text the agent reads is not instructions) *(added)*
 - [x] Test without the network (fake models) and run the tests in CI *(added)*

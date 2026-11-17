@@ -40,6 +40,7 @@ uv run rag-playground --agentic   # the model calls search_campaign when and as 
 uv run rag-playground --hybrid    # search by keyword as well as by vector (works with --agentic)
 uv run rag-playground --agentic --graph   # also give the model a knowledge graph lookup
 uv run rag-playground --agentic --grep    # also give the model a regular-expression search
+uv run rag-eval                           # score vector, hybrid and grep retrieval on an eval set
 ```
 
 The document is split on its heading styles and packed into ~300-word chunks that start with
@@ -59,7 +60,10 @@ contains the sentence the model quotes for it and both names. The model also dra
 "Vecna"); review and edit that file, it is never overwritten. The chat model then gets a
 `campaign_relations` tool to look a name up under all its aliases. `--grep` (with `--agentic`)
 gives the model `grep_campaign`, an exact, case-insensitive regex search over the paragraphs
-with no index: each hit is the section title and the text around the match, at most 30. Both modes print which chapters were retrieved, so you
+with no index: each hit is the section title and the text around the match, at most 30.
+`rag-eval` reads `data/rag/<name>.eval.json` (questions, the sections that answer them, and
+a regex for grep; format in `src/rag_playground/evaluate.py`) and prints, per search mode,
+how many questions got an answering section back, words returned and time per question. Both modes print which chapters were retrieved, so you
 can see why an answer came out the way it did. Two-step answers each question on its own;
 agentic keeps the conversation. `loader.py` knows this document's heading style names
 (`SamKop`, `Samkop2`); change them there for another document.
