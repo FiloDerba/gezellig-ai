@@ -15,13 +15,17 @@ def main() -> None:
     parser.add_argument(
         "--graph", action="store_true", help="with --agentic: add a knowledge graph lookup tool"
     )
+    parser.add_argument(
+        "--grep", action="store_true", help="with --agentic: add a regular-expression search tool"
+    )
     args = parser.parse_args()
-    if args.graph and not args.agentic:
-        parser.error("--graph needs --agentic: the graph is a tool the model chooses to call")
+    for flag in ("graph", "grep"):
+        if getattr(args, flag) and not args.agentic:
+            parser.error(f"--{flag} needs --agentic: it is a tool the model chooses to call")
 
     index = load_index(hybrid=args.hybrid)
     graph = load_graph(index.chunks) if args.graph else None
-    agent = rag.agentic(index, graph=graph) if args.agentic else None
+    agent = rag.agentic(index, graph=graph, grep=args.grep) if args.agentic else None
 
     mode = "Agentic" if args.agentic else "Two-step"
     search = "hybrid" if args.hybrid else "vector"

@@ -39,6 +39,7 @@ uv run rag-playground             # two-step: always retrieve 5 chunks, then ans
 uv run rag-playground --agentic   # the model calls search_campaign when and as often as it wants
 uv run rag-playground --hybrid    # search by keyword as well as by vector (works with --agentic)
 uv run rag-playground --agentic --graph   # also give the model a knowledge graph lookup
+uv run rag-playground --agentic --grep    # also give the model a regular-expression search
 ```
 
 The document is split on its heading styles and packed into ~300-word chunks that start with
@@ -56,7 +57,9 @@ an interrupted build continues where it stopped. A relation is kept only when it
 contains the sentence the model quotes for it and both names. The model also drafts
 `data/rag/<name>.aliases.json`, groups of names that mean the same thing ("Cevan",
 "Vecna"); review and edit that file, it is never overwritten. The chat model then gets a
-`campaign_relations` tool to look a name up under all its aliases. Both modes print which chapters were retrieved, so you
+`campaign_relations` tool to look a name up under all its aliases. `--grep` (with `--agentic`)
+gives the model `grep_campaign`, an exact, case-insensitive regex search over the paragraphs
+with no index: each hit is the section title and the text around the match, at most 30. Both modes print which chapters were retrieved, so you
 can see why an answer came out the way it did. Two-step answers each question on its own;
 agentic keeps the conversation. `loader.py` knows this document's heading style names
 (`SamKop`, `Samkop2`); change them there for another document.

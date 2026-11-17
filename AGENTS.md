@@ -66,7 +66,7 @@ Python 3.14, managed with `uv` (one `pyproject.toml`, one `uv.lock`, one `.venv`
 | Area | Path | What it is | Entry point |
 |---|---|---|---|
 | AI playground | `src/ai_playground/` | pydantic-ai chat agent (local Ollama by default) with `date` + Tavily `web_search` tools. Accepts `extra_context` / `extra_tools` so hosts can extend it. | `uv run gezellig-ai` |
-| RAG playground | `src/rag_playground/` | Two-step and agentic RAG over a local document (git-ignored `data/rag/`), embedded with a local Ollama model and searched in LanceDB (numpy fallback: `RAG_STORE=numpy`; `--hybrid` adds keyword search; `--graph` adds a knowledge graph lookup tool to agentic mode). | `uv run rag-playground [--agentic] [--hybrid] [--graph]` |
+| RAG playground | `src/rag_playground/` | Two-step and agentic RAG over a local document (git-ignored `data/rag/`), embedded with a local Ollama model and searched in LanceDB (numpy fallback: `RAG_STORE=numpy`; `--hybrid` adds keyword search; `--graph` adds a knowledge graph lookup tool to agentic mode; `--grep` adds a regex search tool). | `uv run rag-playground [--agentic] [--hybrid] [--graph] [--grep]` |
 | Dutch trainer UI | `src/dutch_learning/` | Streamlit app: spaced-repetition study, AI coach, pronunciation scoring (Gemini), assistant page. No business logic here. | `uv run streamlit run streamlit_app.py` |
 | Dutch trainer backend | `django/` | Django used **as a library** (ORM + admin), not a server. `vocabulary/` holds models, SM-2 (`srs.py`), reads (`selectors.py`), writes (`services.py`), Anki import. | `django/manage.py` |
 | Tests | `tests/` (app/agent), `django/**/test_*.py` | pytest | `uv run pytest` |

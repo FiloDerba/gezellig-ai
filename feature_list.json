@@ -1,6 +1,6 @@
 {
   "project": "gezellig-ai",
-  "last_updated": "2026-11-11",
+  "last_updated": "2026-11-17",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -139,6 +139,25 @@
         "2026-11-11: NOT DONE: the real rebuild. It was started, then stopped at 13 of 657 chunks and put on hold at the user's request."
       ],
       "notes": "Until the rebuild runs, --graph has no graph: the cache key now includes the prompt, so the old graph is not loaded and the next --graph start begins the two-hour build. The old graph is kept as data/rag/setting-the-darkness-ablaze.graph-v1.json (git-ignored). The checks are deterministic and do not judge meaning; a second model pass that checks each relation was not built."
+    },
+    {
+      "id": "rag-006",
+      "priority": 8,
+      "area": "rag_playground",
+      "title": "RAG playground: grep tool for agentic mode (--grep)",
+      "user_visible_behavior": "`uv run rag-playground --agentic --grep` gives the model a grep_campaign tool next to search_campaign: a case-insensitive regular expression over every paragraph, no index. Each hit is the section title plus up to 200 characters either side of the first match; at most 30 hits, then '... and N more'. An invalid pattern returns an error message the model can fix. --grep without --agentic is refused.",
+      "status": "passing",
+      "verification": [
+        "Run ./init.sh.",
+        "Run the tool on the real document and check result size and speed.",
+        "Ask one real question with --agentic --grep."
+      ],
+      "evidence": [
+        "2026-11-17: ./init.sh exit 0 (see claude-progress.md session log); 4 new tests (matching and errors, snippet window, cap, agent calls the tool).",
+        "2026-11-17: real document, 657 chunks: 4 to 9 ms per grep. First version returned whole paragraphs: 8,243 words for 'Vecna|Cevan'. With 200-character snippets: 2,134 words ('Vecna|Cevan', 123 hits capped at 30) and 1,663 ('silver').",
+        "2026-11-17: gemma4:e2b, 'Which chapters mention the Silver Hand, and what is it?': search_campaign returned 5 story chapters and missed the Factions of Aeloria section; grep_campaign('Silver Hand') found its 2 paragraphs and the answer came from them."
+      ],
+      "notes": "Added next to search_campaign, not instead of it, so the model picks. Not measured: the 14 name questions used for --hybrid, or grep alone versus hybrid. Only the first match per paragraph is shown."
     }
   ]
 }

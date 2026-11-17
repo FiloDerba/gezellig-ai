@@ -142,3 +142,16 @@ before handoff (see `AGENTS.md`).
   still passes. The alias draft makes mistakes ("Rayl" grouped with Cevan) and needs review.
 - Next best step: run the rebuild (`uv run rag-playground --agentic --graph`), review the
   alias file, judge a sample of 50 new relations, then update the wiki with the numbers.
+
+### Session 006
+
+- Date: 2026-11-17
+- Goal: a grep tool for agentic RAG (`rag-006`), next to vector and hybrid search.
+- Completed: `grep_tool` in `rag.py` (case-insensitive regex per paragraph, 200-character
+  snippets, max 30 hits), `--grep` flag (needs `--agentic`), 4 tests, README/AGENTS rows.
+- Verification run: `./init.sh` exit 0, pytest 125 passed. Real-document check and one real
+  question recorded under `rag-006` in `feature_list.json`.
+- Known risk or unresolved issue: grep not yet compared with hybrid on the 14 name questions.
+  `rag-005` graph rebuild still on hold (user's choice, too slow for now).
+- Next best step: a small eval set (questions + expected sections) to compare vector, hybrid
+  and grep fairly.

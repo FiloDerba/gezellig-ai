@@ -125,6 +125,32 @@ def test_agentic_agent_calls_search_campaign(capsys):
     assert "search_campaign(" in capsys.readouterr().out
 
 
+def test_grep_tool_matches_paragraphs_case_insensitively_with_their_section():
+    grep = rag.grep_tool(["Chapter 1\nVecna rose.\nWe ran.", "Chapter 2\nThe lich vecna fell."])
+    assert grep("vecna") == "Chapter 1: Vecna rose.\n\nChapter 2: The lich vecna fell."
+    assert grep("^We") == "Chapter 1: We ran."  # a pattern sees one paragraph, not the title
+    assert "No paragraph matches" in grep("Tiamat")
+    assert "Not a valid regular expression" in grep("(")
+
+
+def test_grep_tool_shows_only_the_text_around_the_match():
+    line = "x" * 300 + "Vecna" + "y" * 300
+    found = rag.grep_tool(["Ch\n" + line])("vecna").removeprefix("Ch: ")
+    assert found == "..." + "x" * rag.CONTEXT_CHARS + "Vecna" + "y" * rag.CONTEXT_CHARS + "..."
+
+
+def test_grep_tool_caps_long_results():
+    lines = rag.grep_tool(["Ch\n" + "\n".join(["a"] * (rag.MAX_MATCHES + 2))])("a").split("\n\n")
+    assert len(lines) == rag.MAX_MATCHES + 1 and lines[-1] == "... and 2 more"
+
+
+def test_agentic_agent_with_grep_can_call_it(capsys):
+    model = TestModel(call_tools=["grep_campaign"])  # it greps for "a"
+    output, _ = rag.agentic(fake_index(), model, grep=True).run("Where is the swamp?")
+    assert output
+    assert "grep_campaign('a') -> 1 paragraphs" in capsys.readouterr().out
+
+
 NERWEN = Relation(
     source="Nerwen", relation="banished", target="Old Gods", quote="Nerwen banished the Old Gods."
 )
